@@ -1,0 +1,11 @@
+{
+  "menus": {
+    "main": {
+      "content": {
+        "type": "none",
+        "text": "📋 Главное меню"
+      },
+      "buttons": []
+    }
+  }
+}

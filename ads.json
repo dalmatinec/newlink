@@ -1,0 +1,14 @@
+{
+  "slots": {
+    "1": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "2": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "3": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "4": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "5": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "6": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "7": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "8": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "9": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}},
+    "10": {"enabled": false, "content": null, "buttons": [], "schedule": {"mode": "every_start", "interval_hours": 24, "times_per_day": 1}}
+  }
+}

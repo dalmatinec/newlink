@@ -1,0 +1,5 @@
+{
+  "ads_enabled": true,
+  "default_invite_mode": "request",
+  "default_duration_minutes": 60
+}
