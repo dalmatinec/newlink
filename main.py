@@ -4,10 +4,11 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
 from database import init_db
-from handlers import admin, group, user
+from handlers import admin, group, panel, user
 
 
 async def main() -> None:
@@ -15,10 +16,11 @@ async def main() -> None:
     init_db()
 
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
 
-    # Порядок важен: сначала команды админа, потом ответы из группы,
+    # Порядок важен: админ-панель и команды, потом ответы из группы,
     # в конце — сообщения пользователей в ЛС (с антифлудом).
+    dp.include_router(panel.router)
     dp.include_router(admin.router)
     dp.include_router(group.router)
     dp.include_router(user.router)

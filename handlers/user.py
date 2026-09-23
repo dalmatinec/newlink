@@ -9,6 +9,7 @@ from aiogram.types import Message
 
 import database as db
 from middlewares.antiflood import AntiFloodMiddleware
+from services.ads import maybe_show_ad
 from utils import render
 
 router = Router(name="user")
@@ -30,6 +31,7 @@ async def _forward_to_group(message: Message) -> bool:
         log.warning("Не удалось переслать в группу %s: %s", group_id, e)
         return False
     db.map_message(group_id, forwarded.message_id, message.from_user.id)
+    db.bump_stat("messages")
     return True
 
 
@@ -44,6 +46,7 @@ async def cmd_start(message: Message) -> None:
     text = render("start", name=escape(user.first_name or ""))
     if text:
         await message.answer(text)
+    await maybe_show_ad(message.bot, user.id, is_start=True)
 
 
 @router.message(F.text)
@@ -56,6 +59,7 @@ async def user_text(message: Message) -> None:
     text = render("sent")
     if text:
         await message.answer(text)
+    await maybe_show_ad(message.bot, user.id, is_start=False)
 
 
 @router.message()

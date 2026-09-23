@@ -88,6 +88,7 @@ async def group_reply(message: Message, bot: Bot) -> None:
 
     # Реплай на этот ответ коллеги тоже уйдёт тому же пользователю.
     db.map_message(message.chat.id, message.message_id, user_id)
+    db.bump_stat("replies")
     try:
         await bot.set_message_reaction(
             message.chat.id, message.message_id, [ReactionTypeEmoji(emoji="👍")]
