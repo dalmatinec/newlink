@@ -4,41 +4,27 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
 from database import init_db
-from database_admin import init_admin_db
-from services.cleanup import clean_temp
-
-from handlers import start, links
-from admin import admin_menu, admin_links, admin_ads, admin_broadcast, admin_settings, admin_stats
+from handlers import admin, group, user
 
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
-
     init_db()
-    init_admin_db()
-    clean_temp()
 
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    dp = Dispatcher(storage=MemoryStorage())
+    dp = Dispatcher()
 
-    # Добавление нового модуля — это ОДНА строка ниже, без изменения
-    # остального проекта: from handlers.news import router; dp.include_router(router)
-    dp.include_router(start.router)
-    dp.include_router(links.router)
-
-    dp.include_router(admin_menu.router)
-    dp.include_router(admin_links.router)
-    dp.include_router(admin_ads.router)
-    dp.include_router(admin_broadcast.router)
-    dp.include_router(admin_settings.router)
-    dp.include_router(admin_stats.router)
+    # Порядок важен: сначала команды админа, потом ответы из группы,
+    # в конце — сообщения пользователей в ЛС (с антифлудом).
+    dp.include_router(admin.router)
+    dp.include_router(group.router)
+    dp.include_router(user.router)
 
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
 
 if __name__ == "__main__":
