@@ -11,7 +11,9 @@ import logging
 from dataclasses import dataclass
 from html import escape
 
+from aiogram.enums import ChatMemberStatus
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.types import ChatMemberAdministrator
 
 from ..app import App
 from ..store import Item, now
@@ -204,12 +206,62 @@ class LinkService:
     # ---------- чаты ----------
     async def bind(self, item_id: int, chat_id: int) -> None:
         item = self.app.store.items.get(item_id)
-        if item and item.chat_id and item.chat_id != chat_id:
+        old_chat = item.chat_id if item else None
+        if old_chat and old_chat != chat_id:
             await self.revoke("item_id = ?", (item_id,))
         await self.app.db.execute("UPDATE items SET chat_id = ?, broken = 0, kind = 'invite' WHERE id = ?",
                                   (chat_id, item_id))
         await self.app.reload()
+        if old_chat and old_chat != chat_id:
+            await self.forget_if_dead(old_chat)
         self.wake.set()
+
+    async def forget_if_dead(self, chat_id: int) -> None:
+        """Мёртвый чат, к которому не привязана ни одна кнопка, убирается из списка подключённых."""
+        if await self.app.db.execute_rowcount(
+                "DELETE FROM chats WHERE id = ? AND is_present = 0 "
+                "AND id NOT IN (SELECT chat_id FROM items WHERE chat_id IS NOT NULL)", (chat_id,)):
+            await self.app.reload()
+
+    async def chat_gone(self, chat_id: int, reason: str) -> None:
+        """Чат удалён, заморожен или бота там больше нет."""
+        await self.app.db.execute("UPDATE chats SET is_present = 0, can_invite = 0, updated_at = ? WHERE id = ?",
+                                  (now(), chat_id))
+        await self.chat_failed(chat_id, reason)
+        await self.forget_if_dead(chat_id)
+
+    async def check_chats(self) -> None:
+        """Проверка всех чатов настоящим действием: создать и сразу отозвать ссылку.
+        Так ловятся и удалённые, и замороженные чаты, о которых Telegram ничего не присылает.
+        Сбои сети и сервера Telegram чат мёртвым не делают: проверим в следующий раз."""
+        bot = self.app.bot
+        for chat in list(self.app.store.chats.values()):
+            try:
+                me = await bot.get_chat_member(chat.id, bot.id)
+                if me.status in (ChatMemberStatus.LEFT, ChatMemberStatus.KICKED):
+                    await self.chat_gone(chat.id, "бота нет в чате")
+                    continue
+                if not (isinstance(me, ChatMemberAdministrator) and me.can_invite_users):
+                    if chat.can_invite or not chat.is_present:
+                        await self.app.db.execute("UPDATE chats SET is_present = 1, can_invite = 0 WHERE id = ?",
+                                                  (chat.id,))
+                        await self.chat_failed(chat.id, "у бота нет права Приглашать пользователей")
+                    continue
+                probe = await bot.create_chat_invite_link(chat.id, name="проверка бота", member_limit=1)
+                await bot.revoke_chat_invite_link(chat.id, probe.invite_link)
+            except TelegramRetryAfter as e:
+                await asyncio.sleep(e.retry_after + 1)
+                continue
+            except (TelegramBadRequest, TelegramForbiddenError) as e:
+                await self.chat_gone(chat.id, e.message)
+                continue
+            except TelegramAPIError:
+                continue
+            if not (chat.can_invite and chat.is_present):
+                await self.app.db.execute("UPDATE chats SET is_present = 1, can_invite = 1 WHERE id = ?", (chat.id,))
+                await self.app.reload()
+            await self.chat_restored(chat.id)
+            await asyncio.sleep(0.3)
 
     async def chat_failed(self, chat_id: int, reason: str) -> None:
         """Чат недоступен: кнопки помечаются сломанными, админам уведомление (один раз)."""
@@ -224,7 +276,8 @@ class LinkService:
             title = escape(chat.title if chat else str(chat_id))
             names = ", ".join(f"{escape(i.label)}" for i in newly)
             await self.app.alert(
-                f"⚠️ <b>Чат {title} недоступен</b> ({escape(reason)[:150]}).\n"
+                f"⚠️ <b>Чат {title} недоступен</b>: удалён, заморожен или у бота нет прав "
+                f"({escape(reason)[:150]}).\n"
                 f"Не работают кнопки: {names}.\n\n"
                 "Замени чат: /admin → 🔗 Кнопки → кнопка → 🔄 Заменить чат.",
                 perm="links",

@@ -337,7 +337,7 @@ class Admin(Base):
         from bot.handlers.admin.content import GROUPS, TEXTS
         from bot.handlers.admin.system import SETTING_GROUPS
         screens += [f"a:text:{k}" for k in TEXTS] + [f"a:txg:{g}" for g in GROUPS]
-        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:lay", f"a:lay:{item_id}", f"a:imore:{item_id}", f"a:admore:{ad_id}"]
+        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:chats", "a:lay", f"a:lay:{item_id}", f"a:imore:{item_id}", f"a:admore:{ad_id}"]
         for cb in screens:
             m = await h.admin(cb)
             self.assertNotIn("Ошибка", m.text or "", cb)
@@ -421,6 +421,39 @@ class Admin(Base):
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         self.assertTrue(app.is_banned(USER))
+
+
+class ChatHealth(Base):
+    async def test_dead_unused_chat_disappears_bound_one_stays(self):
+        h, app, tg = self.h, self.app, self.tg
+        item_id = await h.make_item()               # кнопка в CHAN
+        await h.bot_status(CHAN2, title="Лишний")    # чат без кнопок
+        self.assertIn(CHAN2, app.store.chats)
+
+        tg.frozen_chats.update({CHAN, CHAN2})        # оба заморозили: Telegram молчит, но ссылки не создать
+        await app.links.check_chats()
+        self.assertNotIn(CHAN2, app.store.chats, "мёртвый чат без кнопок пропал из списка")
+        self.assertIn(CHAN, app.store.chats, "к этому чату привязана кнопка, он остаётся")
+        self.assertFalse(app.store.item_ready(app.store.items[item_id]))
+        self.assertIn("удалён, заморожен", tg.last(OWNER).text)
+        picks = await h.admin(f"a:pick:{item_id}")
+        self.assertNotIn("Лишний", str(picks.markup))
+
+        tg.frozen_chats.clear()                      # разморозили
+        await app.links.check_chats()
+        self.assertTrue(app.store.item_ready(app.store.items[item_id]), "ожил сам")
+
+    async def test_kicked_unused_chat_removed_and_rebind_cleans_old(self):
+        h, app = self.h, self.app
+        await h.bot_status(CHAN2, title="Временный")
+        await h.bot_status(CHAN2, status="kicked", by=99)
+        self.assertNotIn(CHAN2, app.store.chats)
+        item_id = await h.make_item()
+        await h.bot_status(CHAN, status="kicked", by=99)
+        self.assertIn(CHAN, app.store.chats)          # держим, пока кнопка на нём
+        await h.bot_status(CHAN2, title="Новый")
+        await h.admin(f"x:bindto:{item_id}:{CHAN2}")
+        self.assertNotIn(CHAN, app.store.chats, "после замены старый мёртвый чат убран")
 
 
 class Layout(Base):
