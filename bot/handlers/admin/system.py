@@ -14,23 +14,42 @@ from .journal import describe
 
 # ключ -> (название, минимум, максимум)
 SETTINGS = {
-    "pool_size": ("⚡️ Готовых ссылок в запасе на кнопку", 0, 50),
-    "cleanup_hours": ("🧹 Отзывать неиспользованные ссылки через, ч (0 - нет)", 0, 720),
-    "sponsor_cache_minutes": ("🤝 Помнить проверку подписки, мин", 0, 1440),
+    "pool_size": ("⚡️ Запас ссылок на кнопку", 0, 50),
+    "cleanup_hours": ("🧹 Отзывать неиспользованные через, ч", 0, 720),
+    "sponsor_cache_minutes": ("⏱ Помнить проверку подписки, мин", 0, 1440),
     "tz_offset": ("🕒 Часовой пояс, UTC+", -12, 14),
     "backup_hour": ("💾 Час автобэкапа", 0, 23),
     "max_media_mb": ("🖼 Лимит картинок, МБ", 1, 20),
 }
 TOGGLES = {
-    "strict_requests": "🔒 Заявки только от владельца ссылки",
-    "clean_chat": "🧹 Удалять сообщения пользователей",
-    "protect_content": "🚫 Запрет пересылки экранов",
-    "log_admin_actions": "📜 Действия админов в канал логов",
+    "strict_requests": "🔒 Заявки только от владельца",
+    "clean_chat": "🧹 Удалять сообщения юзеров",
+    "protect_content": "🚫 Запрет пересылки",
+    "log_admin_actions": "📜 Действия админов в логи",
+}
+# разделы настроек: ключ -> (название, пояснение, настройки)
+SETTING_GROUPS = {
+    "links": ("⚡️ Ссылки",
+              "<b>Запас</b>: бот заранее создаёт ссылки, и юзер получает свою мгновенно. 5 хватает, "
+              "при больших наплывах можно 20-30.\n<b>Отзыв</b>: через сколько часов убирать ссылки, "
+              "по которым не вошли (0 не убирать).\n<b>Заявки</b>: одобрять только того, кому выдана ссылка.",
+              ["pool_size", "cleanup_hours", "strict_requests"]),
+    "sponsors": ("🤝 Спонсоры",
+                 "Сколько минут бот помнит, что человек подписан, и не проверяет его снова. "
+                 "Меньше: точнее, больше: быстрее.", ["sponsor_cache_minutes"]),
+    "chat": ("💬 Чат с юзером",
+             "<b>Удалять сообщения</b>: в чате остаётся только экран бота.\n"
+             "<b>Запрет пересылки</b>: юзер не сможет переслать или сохранить экраны бота.",
+             ["clean_chat", "protect_content"]),
+    "logs": ("📡 Логи и бэкап",
+             "В канал логов приходят ошибки, бэкапы, отчёты рекламы и уведомления о сломанных чатах. "
+             "Без канала бэкапы идут владельцу в личку.", ["log_chat", "log_admin_actions", "backup_hour"]),
+    "other": ("🕒 Прочее", "Часовой пояс нужен для дат в отчётах и времени бэкапа.", ["tz_offset", "max_media_mb"]),
 }
 PROTECTION = {
-    "flood_limit": ("Нажатий за окно (0 - выключить)", 0, 100),
+    "flood_limit": ("Нажатий за окно (0 выключить)", 0, 100),
     "flood_window": ("Окно антифлуда, сек", 1, 60),
-    "flood_strikes": ("Нарушений до автобана (0 - без бана)", 0, 100),
+    "flood_strikes": ("Нарушений до автобана (0 без бана)", 0, 100),
     "flood_ban_minutes": ("Автобан, минут", 0, 100000),
 }
 ALL_NUMBERS = {**SETTINGS, **PROTECTION}
@@ -78,18 +97,33 @@ async def view_stats(ctx: Ctx) -> ViewResult:
 
 
 # ---------- настройки ----------
+def back_cb(back: str) -> str:
+    """Куда вернуться после правки: g_<раздел> это раздел настроек, иначе экран по имени."""
+    return f"a:setg:{back[2:]}" if back.startswith("g_") else f"a:{back}"
+
+
 @view("set", "settings")
 async def view_settings(ctx: Ctx) -> ViewResult:
-    s = ctx.app.store.setting
-    rows: Rows = [[b(f"{title}: {s(key)}", f"x:setv:{key}:set")] for key, (title, _, _) in SETTINGS.items()]
-    rows += [[b(f"{title}: {yes_no(s(key, 0))}", f"x:settog:{key}:set")] for key, title in TOGGLES.items()]
-    rows.insert(0, [b(f"📡 Канал логов: {ctx.app.log_chat or 'не задан'}", "x:logchat")])
+    btns = [b(title, f"a:setg:{g}") for g, (title, _, _) in SETTING_GROUPS.items()]
+    rows: Rows = [btns[i:i + 2] for i in range(0, len(btns), 2)]
     rows.append(back_btn("a:cfg"))
-    html = ("⚙️ <b>Настройки</b>\n\n"
-            "⚡️ <b>Запас ссылок</b> - бот заранее создаёт ссылки, и юзер получает свою мгновенно. "
-            "5 хватает с головой; при больших наплывах можно поднять до 20 - 30.\n"
-            "📡 <b>Канал логов</b> - туда идут ошибки, бэкапы, отчёты рекламы и уведомления о сломанных чатах.")
-    return html, rows
+    return "⚙️ <b>Настройки</b>\nВыбери раздел.", rows
+
+
+@view("setg", "settings")
+async def view_setting_group(ctx: Ctx, group: str) -> ViewResult:
+    title, about, keys = SETTING_GROUPS.get(group, SETTING_GROUPS["links"])
+    s = ctx.app.store.setting
+    rows: Rows = []
+    for key in keys:
+        if key == "log_chat":
+            rows.append([b(f"📡 Канал логов: {'подключён' if ctx.app.log_chat else 'не задан'}", "x:logchat")])
+        elif key in TOGGLES:
+            rows.append([b(f"{TOGGLES[key]}: {yes_no(s(key, 0))}", f"x:settog:{key}:g_{group}")])
+        else:
+            rows.append([b(f"{SETTINGS[key][0]}: {s(key)}", f"x:setv:{key}:g_{group}")])
+    rows.append(back_btn("a:set"))
+    return f"{title}\n\n{about}", rows
 
 
 @view("prot", "settings")
@@ -106,7 +140,7 @@ async def view_protection(ctx: Ctx) -> ViewResult:
 @action("setv", "settings")
 async def act_setting_value(ctx: Ctx, key: str, back: str):
     title, lo, hi = ALL_NUMBERS[key]
-    return await ctx.ask("setv", f"<b>{title}</b>\nОтправьте число от {lo} до {hi}.", f"a:{back}", key, back)
+    return await ctx.ask("setv", f"<b>{title}</b>\nОтправь число от {lo} до {hi}.", back_cb(back), key, back)
 
 
 @on_input("setv", "settings")
@@ -123,13 +157,13 @@ async def in_setting_value(ctx: Ctx, message: Message, key: str, back: str):
         ctx.app.links.wake.set()
     await ctx.log("settings", f"{key}={value}")
     ctx.notice = "✅ Сохранено"
-    return f"a:{back}"
+    return back_cb(back)
 
 
 @action("settog", "settings")
 async def act_setting_toggle(ctx: Ctx, key: str, back: str):
     await ctx.app.set_setting(key, 0 if ctx.app.store.setting(key, 0) else 1)
-    return f"a:{back}"
+    return back_cb(back)
 
 
 @action("logchat", "settings")
@@ -139,7 +173,7 @@ async def act_log_chat(ctx: Ctx):
         "📡 <b>Канал логов</b>\n\n1. Создайте приватный канал.\n"
         "2. Добавьте бота администратором (с правом публиковать).\n"
         "3. Перешлите сюда любое сообщение из канала или отправьте его ID (начинается с -100).\n\n"
-        "Отправьте <code>0</code>, чтобы отключить.", "a:set")
+        "Отправьте <code>0</code>, чтобы отключить.", "a:setg:logs")
 
 
 @on_input("logchat", "settings")
@@ -160,7 +194,7 @@ async def in_log_chat(ctx: Ctx, message: Message):
     await ctx.app.set_setting("log_chat_id", chat_id)
     await ctx.log("logchat.set", str(chat_id))
     ctx.notice = "✅ Канал логов подключён." if chat_id else "Канал логов отключён."
-    return "a:set"
+    return "a:setg:logs"
 
 
 # ---------- бэкап ----------

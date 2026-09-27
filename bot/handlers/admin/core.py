@@ -255,8 +255,8 @@ def back_btn(cb: str, text: str = "◀️ Назад") -> list[InlineKeyboardBut
     return [button(text, cb=cb)]
 
 
-def b(text: str, cb: str, style: str | None = None) -> InlineKeyboardButton:
-    return button(text, cb=cb, style=style)
+def b(text: str, cb: str, style: str | None = None, icon: str | None = None) -> InlineKeyboardButton:
+    return button(text, icon, style, cb=cb)
 
 
 def yes_no(v: Any) -> str:
@@ -270,12 +270,21 @@ def snippet(html: str, limit: int = 300) -> str:
     return escape(plain[:limit] + ("..." if len(plain) > limit else ""))
 
 
+def preview(html: str, limit: int = 700) -> str:
+    """Текст как его увидит юзер: с форматированием и премиум-эмодзи. Длинный: коротко и без разметки."""
+    plain = html_to_plain(html).strip()
+    if not plain:
+        return "<i>пусто</i>"
+    return html if len(plain) <= limit and len(html) <= 2500 else snippet(html, limit)
+
+
 def style_name(style: str | None) -> str:
     return STYLE_NAMES.get(style, style or "обычная")
 
 
 def icon_line(icon: str | None) -> str:
-    return f'<tg-emoji emoji-id="{icon}">⭐️</tg-emoji> <code>{icon}</code>' if icon else "нет"
+    return (f'<tg-emoji emoji-id="{icon}">⭐️</tg-emoji> (ID <code>{icon}</code>)' if icon
+            else "нет (пришли название с премиум-эмодзи, оно станет иконкой)")
 
 
 def media_line(app: App, media_id: int | None) -> str:
@@ -461,10 +470,16 @@ async def act_set_style(ctx: Ctx, kind: str, key: str, style: str):
 
 
 def label_rows(kind: str, key: str, row: Any) -> Rows:
-    rows: Rows = [[b("✏️ Текст и иконка", f"x:lbl:{kind}:{key}"), b(f"🎨 {style_name(row['style'])}", f"a:col:{kind}:{key}")]]
+    rows: Rows = [[b("✏️ Название и иконка", f"x:lbl:{kind}:{key}"),
+                   b(f"🎨 Цвет: {style_name(row['style'])}", f"a:col:{kind}:{key}", row["style"])]]
     if row["icon"]:
         rows.append([b("✖️ Убрать иконку", f"x:noico:{kind}:{key}")])
     return rows
+
+
+def label_info(row: Any) -> str:
+    """Строка для экрана: как выглядит кнопка (иконка, цвет)."""
+    return f"Иконка: {icon_line(row['icon'])}\nЦвет: {style_name(row['style'])}"
 
 
 def rich_rows(kind: str, key: str, row: Any) -> Rows:
