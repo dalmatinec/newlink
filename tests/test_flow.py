@@ -189,7 +189,7 @@ class LinkFlow(Base):
         self.assertTrue(join_url(h.user_screen(USER)).startswith("https://t.me/+"))
         self.assertEqual(tg.links_created, 1)
 
-    async def test_request_mode_strict(self):
+    async def test_request_mode_admins_decide(self):
         h, app, tg = self.h, self.app, self.tg
         item_id = await h.make_item()
         await h.admin(f"x:imode:{item_id}")
@@ -197,8 +197,12 @@ class LinkFlow(Base):
         await h.send(USER, "/start")
         await h.click(USER, f"i:{item_id}")
         screen = h.user_screen(USER)
-        self.assertIn("заявку", screen.text)
+        self.assertIn("рассмотрят админы", screen.text)
         link = join_url(screen)
+        await h.join_request(CHAN, USER, link)
+        self.assertEqual((tg.approved, tg.declined), ([], []), "по умолчанию заявки принимают админы")
+        # включили автоодобрение: владельца ссылки принимает, чужого отклоняет
+        await h.admin("x:settog:auto_approve:g_links")
         await h.join_request(CHAN, OTHER, link)
         self.assertIn((CHAN, OTHER), tg.declined)
         await h.join_request(CHAN, USER, link)
@@ -500,6 +504,17 @@ class Seed(Base):
         self.assertEqual(await db.fetchval("SELECT html FROM texts WHERE key = 'link_request'"),
                          seed["texts"]["link_request"])
         self.assertEqual(await db.fetchval("SELECT html FROM texts WHERE key = 'start'"), "Мой текст \u2014 свой")
+
+
+class LegacyText(Base):
+    async def test_old_auto_approve_text_replaced(self):
+        from bot.seed import apply_seed, load_seed
+        db = self.app.db
+        old = "🔗 <b>{кнопка}</b>\n\nНажми \u00abВступить\u00bb и отправь заявку \u2014 она одобрится автоматически."
+        await db.execute("UPDATE texts SET html = ? WHERE key = 'link_request'", (old,))
+        await apply_seed(db)
+        self.assertEqual(await db.fetchval("SELECT html FROM texts WHERE key = 'link_request'"),
+                         load_seed()["texts"]["link_request"])
 
 
 class Performance(Base):

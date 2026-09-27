@@ -91,12 +91,14 @@ async def member_changed(event: ChatMemberUpdated, app: App) -> None:
 async def join_request(req: ChatJoinRequest, app: App) -> None:
     if req.invite_link is None:
         return
+    if not app.store.setting("auto_approve", 0):
+        return  # заявки принимают админы канала вручную
     link = req.invite_link.invite_link
     owner = await app.links.owner_of(link)
     if owner is None:
         return  # не наша ссылка: решают админы чата
     try:
-        if app.store.setting("strict_requests", 1) and owner and owner != req.from_user.id:
+        if owner and owner != req.from_user.id:
             await req.decline()  # ссылку переслали другому
         else:
             await req.approve()
