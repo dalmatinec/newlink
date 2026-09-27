@@ -205,6 +205,12 @@ MIGRATIONS: list[str] = [
     ) WITHOUT ROWID;
     CREATE INDEX ix_sponsor_users_user ON sponsor_users(user_id);
     """,
+    # 2: кнопки меню раскладываются по рядам вручную; спонсоры убраны
+    """
+    ALTER TABLE items ADD COLUMN row INTEGER NOT NULL DEFAULT 0;
+    DROP TABLE IF EXISTS sponsor_users;
+    DROP TABLE IF EXISTS sponsors;
+    """,
 ]
 
 

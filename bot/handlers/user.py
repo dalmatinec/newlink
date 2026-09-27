@@ -3,7 +3,6 @@
 Callback-данные:
   m         главное меню
   i:<id>    нажали кнопку-ссылку
-  c:<id>    Я подписался на экране спонсоров
 """
 import math
 
@@ -16,7 +15,7 @@ from ..app import App, Screen
 from ..richtext import html_to_plain
 from ..services.links import LinkBusy, LinkUnavailable
 from ..store import Item, now
-from ..ui import button, current_of, fill, markup, menu_rows, minutes_text, safe_delete, show, sys_button
+from ..ui import current_of, fill, markup, menu_rows, minutes_text, safe_delete, show, sys_button
 
 router = Router(name="user")
 router.message.filter(F.chat.type == "private")
@@ -56,12 +55,11 @@ async def cb_home(call: CallbackQuery, app: App) -> None:
     await show(app, call.from_user.id, call.message.chat.id, html, media_id, kb, current=current_of(call.message))
 
 
-@router.callback_query(F.data.regexp(r"^[ic]:\d+$"))
+@router.callback_query(F.data.regexp(r"^i:\d+$"))
 async def cb_item(call: CallbackQuery, app: App) -> None:
-    kind, item_id = call.data.split(":")
+    item_id = call.data.split(":")[1]
     item = app.store.items.get(int(item_id))
-    await open_item(app, call.from_user, call.message.chat.id, item, current_of(call.message), call,
-                    recheck=kind == "c")
+    await open_item(app, call.from_user, call.message.chat.id, item, current_of(call.message), call)
 
 
 @router.callback_query(F.data == "noop")
@@ -70,7 +68,7 @@ async def cb_noop(call: CallbackQuery) -> None:
 
 
 async def open_item(app: App, user: User, chat_id: int, item: Item | None, current: Screen | None,
-                    call: CallbackQuery | None, recheck: bool = False) -> None:
+                    call: CallbackQuery | None) -> None:
     store = app.store
     answered = False
 
@@ -92,21 +90,6 @@ async def open_item(app: App, user: User, chat_id: int, item: Item | None, curre
         return await fail("unavailable")
     if not store.item_ready(item):
         return await fail("unavailable")
-
-    if not item.skip_sponsors:
-        missing = await app.sponsors.missing(user.id)
-        if missing:
-            if recheck:
-                await answer("sponsors_missing")
-            await answer()
-            sb = store.button("sponsor")
-            rows = [[button(s.title or sb.label, sb.icon, sb.style, url=s.url)] for s in missing]
-            rows.append([sys_button(store, "check_subs", cb=f"c:{item.id}")])
-            rows.append([sys_button(store, "back", cb="m")])
-            text = store.text("sponsors")
-            await show(app, user.id, chat_id, fill(text.html, user=user, button=item.label), text.media_id,
-                       markup(rows), current=current)
-            return
 
     try:
         issued = await app.links.issue(item, user.id)

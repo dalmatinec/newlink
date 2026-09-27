@@ -31,7 +31,6 @@ router.message.filter(F.chat.type == "private")
 PERMS: dict[str, str] = {
     "links": "🔗 Кнопки и чаты",
     "ads": "📢 Реклама",
-    "sponsors": "🤝 Спонсоры",
     "broadcast": "📣 Рассылка",
     "texts": "📝 Тексты",
     "stats": "📊 Статистика",
@@ -530,7 +529,6 @@ async def view_home(ctx: Ctx) -> ViewResult:
     sections = [
         ("links", f"🔗 Кнопки{f' ⚠️{len(broken)}' if broken else ''}", "a:items"),
         ("ads", "📢 Реклама", "a:ads"),
-        ("sponsors", "🤝 Спонсоры", "a:sps"),
         ("broadcast", "📣 Рассылка", "a:bc"),
         ("stats", "📊 Статистика", "a:stats"),
         ("users", "👥 Пользователи", "a:users"),
@@ -547,7 +545,7 @@ async def view_home(ctx: Ctx) -> ViewResult:
         f"Кнопок: <b>{len(store.menu)}</b> активных из {len(store.items)}\n"
         f"Пользователей: <b>{len(app.known_users)}</b>\n"
         f"Вступили за сутки: <b>{joins}</b>\n"
-        f"Реклама: <b>{len(store.active_ads)}</b> идёт · Спонсоры: <b>{len(app.sponsors.active())}</b>"
+        f"Реклама: идёт <b>{len(store.active_ads)}</b>"
     )
     if broken:
         html += "\n\n⚠️ Не работают кнопки: " + ", ".join(f"{escape(i.label)}" for i in broken[:5])

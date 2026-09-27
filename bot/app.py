@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from .services.ads import AdService
     from .services.broadcast import Broadcaster
     from .services.links import LinkService
-    from .services.sponsors import SponsorService
 
 log = logging.getLogger(__name__)
 
@@ -33,8 +32,8 @@ class Screen:
 @dataclass(slots=True)
 class PendingBind:
     """Админ нажал Привязать чат и сейчас добавит бота в канал/группу."""
-    kind: str      # item | sponsor
-    ref: int       # id кнопки (для спонсора - 0, он создаётся при добавлении)
+    kind: str      # item
+    ref: int       # id кнопки
     until: int
 
 
@@ -48,7 +47,6 @@ class App:
     bot_username: str = ""
     links: "LinkService" = None  # type: ignore[assignment]
     ads: "AdService" = None  # type: ignore[assignment]
-    sponsors: "SponsorService" = None  # type: ignore[assignment]
     broadcaster: "Broadcaster" = None  # type: ignore[assignment]
     known_users: set[int] = field(default_factory=set)
     banned: dict[int, int | None] = field(default_factory=dict)  # user_id -> until (None = навсегда)

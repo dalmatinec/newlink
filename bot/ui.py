@@ -60,23 +60,14 @@ def item_button(item: Item) -> InlineKeyboardButton:
 
 
 def menu_rows(store: Store) -> list[list[InlineKeyboardButton]]:
-    """Главное меню: кнопки по N в ряд, широкие - отдельной строкой."""
-    per_row = max(1, min(int(store.setting("per_row", 2)), 4))
+    """Главное меню: ряды ровно так, как их расставили в админке."""
     rows: list[list[InlineKeyboardButton]] = []
-    current: list[InlineKeyboardButton] = []
-    for item in store.menu:
-        if item.wide:
-            if current:
-                rows.append(current)
-                current = []
-            rows.append([item_button(item)])
-            continue
-        current.append(item_button(item))
-        if len(current) >= per_row:
-            rows.append(current)
-            current = []
-    if current:
-        rows.append(current)
+    current = None
+    for item in store.menu:  # уже отсортированы по (row, position)
+        if item.row != current:
+            rows.append([])
+            current = item.row
+        rows[-1].append(item_button(item))
     return rows
 
 

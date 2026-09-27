@@ -3,12 +3,12 @@ from html import escape
 
 from aiogram.types import Message
 
+from ...layout import grid_of, move, rows_of
 from ...richtext import normalize_url, parse_contacts, parse_label
 from ...store import Item, now
 from ...ui import button, minutes_text
 from .core import (
-    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, move, on_input, premium_notice, style_name,
-    view, yes_no,
+    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, on_input, premium_notice, style_name, view,
 )
 
 MODES = {"one_time": "🔂 Одноразовая", "request": "📨 По заявке"}
@@ -47,44 +47,67 @@ def title_html(item: Item) -> str:
     return f"{icon}<b>{escape(item.label)}</b>"
 
 
+def _grid_rows(ctx: Ctx, cb, selected: int | None = None) -> Rows:
+    """Кнопки ровно так, как они стоят в меню у юзеров (ряды, иконки, цвета)."""
+    store = ctx.app.store
+    rows: Rows = []
+    for row in grid_of(store.items.values()):
+        line = []
+        for item_id in row:
+            i = store.items[item_id]
+            mark = "👉 " if item_id == selected else f"{status_icon(ctx, i)} "
+            line.append(b(mark + i.label, cb(i), i.style, i.icon))
+        rows.append(line)
+    return rows
+
+
 @view("items", "links")
 async def view_items(ctx: Ctx) -> ViewResult:
-    store = ctx.app.store
-    items = list(store.items.values())
-    # кнопки показаны так, как их видят юзеры: с иконкой и цветом
-    rows: Rows = [[b(f"{status_icon(ctx, i)} {i.label}", f"a:item:{i.id}", i.style, i.icon)] for i in items]
+    items = list(ctx.app.store.items.values())
+    rows = _grid_rows(ctx, lambda i: f"a:item:{i.id}")
     rows.append([b("➕ Ссылка в чат", "x:inew", "success"), b("🌐 Обычная ссылка", "x:iunew")])
     if len(items) > 1:
-        rows.append([b("↕️ Порядок кнопок", "a:iord"), b(f"▦ В ряду: {store.setting('per_row', 2)}", "x:perrow")])
-    else:
-        rows.append([b(f"▦ В ряду: {store.setting('per_row', 2)}", "x:perrow")])
+        rows.append([b("↕️ Двигать кнопки", "a:lay")])
     rows.append([b("🔌 Чаты бота", "a:chats")])
     rows.append(back_btn("a:home"))
     html = ("🔗 <b>Кнопки меню</b>\n\n"
+            "Кнопки стоят так же, как в меню у юзеров.\n"
             "✅ работает   ⚠️ чат недоступен   🔌 нет чата\n🌐 обычная ссылка   ⏸ выключена\n\n"
             + ("Нажми на кнопку, чтобы настроить." if items else "Кнопок пока нет. Создай первую."))
     return html, rows
 
 
-@action("perrow", "links")
-async def act_per_row(ctx: Ctx):
-    cur = int(ctx.app.store.setting("per_row", 2))
-    await ctx.app.set_setting("per_row", cur % 3 + 1)
-    return "a:items"
+# ---------- расположение ----------
+ARROWS = [("⬅️", "left"), ("⬆️", "up"), ("⬇️", "down"), ("➡️", "right")]
 
 
-@view("iord", "links")
-async def view_order(ctx: Ctx) -> ViewResult:
-    rows: Rows = [[b(i.label, f"a:item:{i.id}", i.style, i.icon), b("⬆️", f"x:iord:{i.id}:-1"), b("⬇️", f"x:iord:{i.id}:1")]
-                  for i in ctx.app.store.items.values()]
-    rows.append(back_btn("a:items"))
-    return "↕️ <b>Порядок кнопок</b>\nЖми ⬆️ и ⬇️, кнопки меняются местами сразу. Так же они стоят в меню у юзеров.", rows
+@view("lay", "links")
+async def view_layout(ctx: Ctx, item_id: str = "") -> ViewResult:
+    store = ctx.app.store
+    sel = int(item_id) if item_id.isdigit() and int(item_id) in store.items else None
+    rows = _grid_rows(ctx, lambda i: f"a:lay:{i.id}", sel)
+    if sel is not None:
+        rows.append([b(arrow, f"x:laymv:{sel}:{d}", "primary") for arrow, d in ARROWS])
+    rows.append([b("✅ Готово", "a:items", "success")])
+    if sel is None:
+        html = ("↕️ <b>Двигать кнопки</b>\n\n"
+                "Это меню так, как его видят юзеры. <b>Нажми на кнопку</b>, которую хочешь передвинуть.")
+    else:
+        html = (f"↕️ Двигаем 👉 <b>{escape(store.items[sel].label)}</b>\n\n"
+                "⬅️ ➡️ поменяться местами с соседом в ряду\n"
+                "⬆️ уйти в свой ряд выше, нажать ещё раз: встать в ряд выше\n"
+                "⬇️ так же вниз\n\n"
+                "Каждое нажатие сразу меняет меню у юзеров. Выбрать другую кнопку: просто нажми на неё.")
+    return html, rows
 
 
-@action("iord", "links")
-async def act_order(ctx: Ctx, item_id: str, delta: str):
-    await move(ctx, "items", int(item_id), int(delta))
-    return "a:iord"
+@action("laymv", "links")
+async def act_layout_move(ctx: Ctx, item_id: str, direction: str):
+    store = ctx.app.store
+    grid = move(grid_of(store.items.values()), int(item_id), direction)
+    await ctx.app.db.executemany("UPDATE items SET row = ?, position = ? WHERE id = ?", rows_of(grid))
+    await ctx.reload()
+    return f"a:lay:{item_id}"
 
 
 # ---------- карточка ----------
@@ -129,7 +152,7 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
         f"Чат: {chat_title(ctx, item.chat_id)}\n"
         f"Тип ссылки: {MODES[item.mode]} ({MODE_HELP[item.mode]})\n"
         f"Срок ссылки: {minutes_text(item.ttl_minutes)}\n"
-        f"Спонсоры перед выдачей: {'нет' if item.skip_sponsors else 'да'}\n\n"
+        "\n"
         f"{look}\n\n"
         f"<b>Статистика</b>\n"
         f"Выдано: сутки <b>{issued_day}</b>, 30 дней <b>{issued_month}</b>\n"
@@ -158,13 +181,7 @@ async def view_item_more(ctx: Ctx, item_id: str) -> ViewResult:
     if item is None:
         return await view_items(ctx)
     k = item.id
-    rows: Rows = []
-    if item.kind == "invite":
-        rows.append([b(f"🤝 Спонсоры: {'нет' if item.skip_sponsors else 'да'}", f"x:isk:{k}:m"),
-                     b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}:m")])
-    else:
-        rows.append([b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}:m")])
-    rows.append([b("⬆️ Выше", f"x:imv:{k}:-1:m"), b("⬇️ Ниже", f"x:imv:{k}:1:m")])
+    rows: Rows = [[b("↕️ Двигать в меню", f"a:lay:{k}")]]
     rows.append([b("⏸ Выключить" if item.is_active else "▶️ Включить", f"x:ion:{k}:m")]
                 + ([b("✖️ Убрать иконку", f"x:inoico:{k}")] if item.icon else []))
     if item.kind == "invite":
@@ -172,12 +189,10 @@ async def view_item_more(ctx: Ctx, item_id: str) -> ViewResult:
     rows.append([b("❌ Удалить кнопку", f"a:idel:{k}", "danger")])
     rows.append(back_btn(f"a:item:{k}"))
     html = (f"⚙️ <b>Ещё: {escape(item.label)}</b>\n\n"
-            "🤝 <b>Спонсоры да</b>: перед выдачей ссылки бот просит подписаться на спонсоров. "
-            "<b>Нет</b>: по этой кнопке ссылка выдаётся сразу, без подписки.\n\n"
-            "↔️ <b>Широкая</b>: кнопка во всю ширину меню, отдельной строкой.\n\n"
-            "⬆️ <b>Выше</b> / ⬇️ <b>Ниже</b>: двигает кнопку на одно место в меню у юзеров. "
-            "Все кнопки сразу удобно двигать в 🔗 Кнопки → ↕️ Порядок кнопок.\n\n"
-            "⏸ <b>Выключить</b>: кнопка пропадёт из меню, настройки сохранятся.")
+            "↕️ <b>Двигать в меню</b>: меню как у юзеров, двигаешь стрелками и сразу видишь результат.\n\n"
+            "⏸ <b>Выключить</b>: кнопка пропадёт из меню, настройки сохранятся."
+            + ("\n\n🗑 <b>Отозвать ссылки</b>: выданные, но не использованные ссылки перестанут работать."
+               if item.kind == "invite" else ""))
     return html, rows
 
 
@@ -229,10 +244,10 @@ async def in_url_new(ctx: Ctx, message: Message):
 
 
 async def _create(ctx: Ctx, kind: str, label: str, icon: str | None, url: str | None = None) -> int:
-    pos = await ctx.app.db.fetchval("SELECT COALESCE(MAX(position), 0) + 1 FROM items")
+    row = await ctx.app.db.fetchval("SELECT COALESCE(MAX(row), -1) + 1 FROM items")
     item_id = await ctx.app.db.execute(
-        "INSERT INTO items(kind, label, icon, url, position, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (kind, label, icon, url, pos, now()))
+        "INSERT INTO items(kind, label, icon, url, row, position, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)",
+        (kind, label, icon, url, row, now()))
     await ctx.reload()
     return item_id
 
@@ -307,18 +322,6 @@ async def in_item_ttl(ctx: Ctx, message: Message, item_id: str):
     return await _set(ctx, item_id, ttl_minutes=int(text))
 
 
-@action("isk", "links")
-async def act_item_skip(ctx: Ctx, item_id: str, back: str = ""):
-    item = item_or_none(ctx, item_id)
-    return await _set(ctx, item_id, back, skip_sponsors=int(not item.skip_sponsors)) if item else "a:items"
-
-
-@action("iwide", "links")
-async def act_item_wide(ctx: Ctx, item_id: str, back: str = ""):
-    item = item_or_none(ctx, item_id)
-    return await _set(ctx, item_id, back, wide=int(not item.wide)) if item else "a:items"
-
-
 @action("ion", "links")
 async def act_item_on(ctx: Ctx, item_id: str, back: str = ""):
     item = item_or_none(ctx, item_id)
@@ -326,12 +329,6 @@ async def act_item_on(ctx: Ctx, item_id: str, back: str = ""):
         return "a:items"
     await ctx.log("item.toggle", f"{item.id}")
     return await _set(ctx, item_id, back, is_active=int(not item.is_active))
-
-
-@action("imv", "links")
-async def act_item_move(ctx: Ctx, item_id: str, delta: str, back: str = ""):
-    await move(ctx, "items", int(item_id), int(delta))
-    return f"a:imore:{item_id}" if back == "m" else f"a:item:{item_id}"
 
 
 @view("irev", "links")
@@ -443,7 +440,6 @@ async def view_chats(ctx: Ctx) -> ViewResult:
     for c in sorted(store.chats.values(), key=lambda c: (not c.is_present, c.title.lower())):
         state = "✅ админ" if c.can_invite else ("⚠️ нет права приглашать" if c.is_present else "🚪 бота убрали")
         used = [i.label for i in store.items.values() if i.chat_id == c.id]
-        used += [f"спонсор {s.title}" for s in store.sponsor_chats.get(c.id, []) if s.is_active]
         lines.append(f"{'📢' if c.type == 'channel' else '👥'} <b>{escape(c.title)}</b> - {state}"
                      + (f"\n   ↳ {escape(', '.join(used))}" if used else ""))
         if not c.is_present and not used:

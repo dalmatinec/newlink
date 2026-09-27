@@ -57,11 +57,6 @@ async def bot_status(event: ChatMemberUpdated, app: App) -> None:
     if not can_invite:
         reason = "бота убрали из чата" if not present else "у бота нет права Приглашать пользователей"
         await app.links.chat_failed(chat.id, reason)
-        if not present and app.store.sponsor_chats.get(chat.id):
-            names = ", ".join(f"{escape(s.title)}" for s in app.store.sponsor_chats[chat.id] if s.is_active)
-            if names:
-                await app.alert(f"⚠️ Бота убрали из канала спонсора {names}: подписку на него проверить нельзя.",
-                                perm="sponsors")
         if pending and present and new.status != ChatMemberStatus.MEMBER:
             await _tell(app, actor.id, f"Я в {t}, но без права Приглашать пользователей. Выдай его - и привяжусь.")
         return  # статус member: права обычно приходят следующим событием
@@ -81,21 +76,6 @@ async def bot_status(event: ChatMemberUpdated, app: App) -> None:
                              f"{escape(actor.first_name or str(actor.id))}: кнопка {escape(item.label)} → {t}")
         await _tell(app, actor.id, f"✅ Кнопка {escape(item.label)} теперь ведёт в {t}.",
                     f"a:item:{item.id}", "🔗 Открыть кнопку")
-    elif pending.kind == "sponsor":
-        try:
-            url = await app.sponsors.create_link(chat.id, "plain")
-        except TelegramAPIError as e:
-            await _tell(app, actor.id, f"Не получилось создать ссылку в {t}: {escape(str(e))[:200]}")
-            return
-        pos = await app.db.fetchval("SELECT COALESCE(MAX(position), 0) + 1 FROM sponsors")
-        sponsor_id = await app.db.execute(
-            "INSERT INTO sponsors(chat_id, title, url, position, created_at) VALUES (?, ?, ?, ?, ?)",
-            (chat.id, title, url, pos, now()))
-        await app.reload()
-        await app.log_action(actor.id, "sponsor.create", title,
-                             f"{escape(actor.first_name or str(actor.id))}: добавил спонсора {t}")
-        await _tell(app, actor.id, f"✅ Спонсор {t} добавлен и уже работает.",
-                    f"a:sp:{sponsor_id}", "🤝 Открыть спонсора")
 
 
 @router.chat_member()
@@ -104,8 +84,7 @@ async def member_changed(event: ChatMemberUpdated, app: App) -> None:
         return
     if _in_chat(event.new_chat_member) and not _in_chat(event.old_chat_member):
         link, user_id = event.invite_link.invite_link, event.new_chat_member.user.id
-        if not await app.links.register_join(event.chat.id, link, user_id):
-            await app.sponsors.on_join(event.chat.id, link, user_id)
+        await app.links.register_join(event.chat.id, link, user_id)
 
 
 @router.chat_join_request()
@@ -115,8 +94,7 @@ async def join_request(req: ChatJoinRequest, app: App) -> None:
     link = req.invite_link.invite_link
     owner = await app.links.owner_of(link)
     if owner is None:
-        await app.sponsors.on_request(req.chat.id, link, req.from_user.id)
-        return  # не наша ссылка - решают админы чата
+        return  # не наша ссылка: решают админы чата
     try:
         if app.store.setting("strict_requests", 1) and owner and owner != req.from_user.id:
             await req.decline()  # ссылку переслали другому
@@ -135,5 +113,4 @@ async def group_migrated(message: Message, app: App) -> None:
         "SELECT ?, title, 'supergroup', username, can_invite, is_present, ? FROM chats WHERE id = ?", (new, now(), old))
     await app.db.execute("DELETE FROM chats WHERE id = ?", (old,))
     await app.db.execute("UPDATE items SET chat_id = ? WHERE chat_id = ?", (new, old))
-    await app.db.execute("UPDATE sponsors SET chat_id = ? WHERE chat_id = ?", (new, old))
     await app.reload()
