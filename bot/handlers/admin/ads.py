@@ -10,7 +10,8 @@ from ...richtext import html_to_plain, message_html, parse_contacts
 from ...services.ads import freq_text
 from ...store import PLACEMENTS, now
 from .core import (
-    Ctx, InputError, Rows, ViewResult, action, b, back_btn, fmt_date, has_media, on_input, preview, save_media, style_name, view,
+    Ctx, InputError, Rows, ViewResult, action, b, back_btn, fmt_date, has_media, on_input, premium_notice, preview,
+    save_media, style_name, view,
 )
 
 STATUS = {"active": "▶️ идёт", "paused": "⏸ на паузе", "draft": "📝 черновик", "finished": "🏁 завершена"}
@@ -119,7 +120,7 @@ async def in_ad_post(ctx: Ctx, message: Message, ad_id: str):
         await ctx.reload()
         await ctx.log("ad.create", title)
         ctx.notice = ("✅ Реклама создана. Проверь её 👁 Предпросмотром, при желании настрой лимит и срок, "
-                      "и жми ▶️ Запустить.")
+                      "и жми ▶️ Запустить." + await premium_notice(ctx, message))
         return f"a:ad:{new_id}"
     fields = {"html": html, "media_id": media_id}
     if buttons:
@@ -127,7 +128,7 @@ async def in_ad_post(ctx: Ctx, message: Message, ad_id: str):
     cols = ", ".join(f"{k} = ?" for k in fields)
     await db.execute(f"UPDATE ads SET {cols} WHERE id = ?", (*fields.values(), int(ad_id)))
     await ctx.reload()
-    ctx.notice = "✅ Пост обновлён"
+    ctx.notice = "✅ Пост обновлён" + await premium_notice(ctx, message)
     return f"a:ad:{ad_id}"
 
 

@@ -17,6 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
 
+from ... import premium
 from ...app import App
 from ...media import KIND_NAMES, MediaError
 from ...richtext import CAPTION_LIMIT, TEXT_LIMIT, html_to_plain, message_html, parse_label
@@ -251,6 +252,15 @@ async def on_admin_input(message: Message, state: FSMContext, app: App, perms: s
 
 
 # ---------- общие элементы экранов ----------
+async def premium_notice(ctx: "Ctx", message: Message) -> str:
+    """Если в сообщении есть премиум-эмодзи — проверить, покажет ли их Telegram, и предупредить."""
+    ids = premium.custom_emoji_ids(message)
+    if not ids:
+        return ""
+    result = await premium.check(ctx.app.bot, ctx.chat_id, ids[0])
+    return "" if result is not None and result.ok else "\n\n" + premium.describe(result)
+
+
 def back_btn(cb: str, text: str = "◀️ Назад") -> list[InlineKeyboardButton]:
     return [button(text, cb=cb)]
 
@@ -365,7 +375,7 @@ async def in_label(ctx: Ctx, message: Message, kind: str, key: str):
         raise InputError("Пустой текст.")
     await update_target(ctx, kind, key, **fields)
     await ctx.log(f"{kind}.label", f"{key}: {label}")
-    ctx.notice = "✅ Сохранено"
+    ctx.notice = "✅ Сохранено" + await premium_notice(ctx, message)
     return TARGETS[kind][2].format(key)
 
 
@@ -411,7 +421,7 @@ async def in_html(ctx: Ctx, message: Message, kind: str, key: str):
         fields["html"] = html
     await update_target(ctx, kind, key, **fields)
     await ctx.log(f"{kind}.html", key)
-    ctx.notice = "✅ Сохранено"
+    ctx.notice = "✅ Сохранено" + await premium_notice(ctx, message)
     return TARGETS[kind][2].format(key)
 
 
@@ -436,7 +446,7 @@ async def in_media(ctx: Ctx, message: Message, kind: str, key: str):
         fields["html"] = html
     await update_target(ctx, kind, key, **fields)
     await ctx.log(f"{kind}.media", key)
-    ctx.notice = "✅ Картинка сохранена"
+    ctx.notice = "✅ Картинка сохранена" + await premium_notice(ctx, message)
     return TARGETS[kind][2].format(key)
 
 
