@@ -7,7 +7,7 @@ from ...richtext import normalize_url, parse_contacts, parse_label
 from ...store import Item, now
 from ...ui import button, minutes_text
 from .core import (
-    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_rows, move, on_input, view, yes_no,
+    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, label_rows, move, on_input, view, yes_no,
 )
 
 MODES = {"one_time": "🔂 Одноразовая", "request": "📨 По заявке"}
@@ -40,18 +40,27 @@ def item_or_none(ctx: Ctx, item_id: str) -> Item | None:
 
 
 # ---------- список ----------
+def title_html(item: Item) -> str:
+    icon = f'<tg-emoji emoji-id="{item.icon}">⭐️</tg-emoji> ' if item.icon else ""
+    return f"{icon}<b>{escape(item.label)}</b>"
+
+
 @view("items", "links")
 async def view_items(ctx: Ctx) -> ViewResult:
     store = ctx.app.store
     items = list(store.items.values())
-    rows: Rows = [[b(f"{status_icon(ctx, i)} {i.label}", f"a:item:{i.id}")] for i in items]
-    rows.append([b("➕ Кнопка-ссылка в чат", "x:inew", "success")])
-    rows.append([b("🌐 Кнопка с обычной ссылкой", "x:iunew")])
-    rows.append([b(f"▦ В ряду: {store.setting('per_row', 2)}", "x:perrow"), b("🔌 Чаты бота", "a:chats")])
+    # кнопки показаны так, как их видят юзеры: с иконкой и цветом
+    rows: Rows = [[b(f"{status_icon(ctx, i)} {i.label}", f"a:item:{i.id}", i.style, i.icon)] for i in items]
+    rows.append([b("➕ Ссылка в чат", "x:inew", "success"), b("🌐 Обычная ссылка", "x:iunew")])
+    if len(items) > 1:
+        rows.append([b("↕️ Порядок кнопок", "a:iord"), b(f"▦ В ряду: {store.setting('per_row', 2)}", "x:perrow")])
+    else:
+        rows.append([b(f"▦ В ряду: {store.setting('per_row', 2)}", "x:perrow")])
+    rows.append([b("🔌 Чаты бота", "a:chats")])
     rows.append(back_btn("a:home"))
     html = ("🔗 <b>Кнопки меню</b>\n\n"
-            "✅ работает · ⚠️ чат недоступен · 🔌 чат не привязан · 🌐 обычная ссылка · ⏸ выключена\n\n"
-            + ("Нажми на кнопку, чтобы настроить её." if items else "Кнопок пока нет - создай первую."))
+            "✅ работает   ⚠️ чат недоступен   🔌 нет чата\n🌐 обычная ссылка   ⏸ выключена\n\n"
+            + ("Нажми на кнопку, чтобы настроить." if items else "Кнопок пока нет. Создай первую."))
     return html, rows
 
 
@@ -62,6 +71,20 @@ async def act_per_row(ctx: Ctx):
     return "a:items"
 
 
+@view("iord", "links")
+async def view_order(ctx: Ctx) -> ViewResult:
+    rows: Rows = [[b(i.label, f"a:item:{i.id}", i.style, i.icon), b("⬆️", f"x:iord:{i.id}:-1"), b("⬇️", f"x:iord:{i.id}:1")]
+                  for i in ctx.app.store.items.values()]
+    rows.append(back_btn("a:items"))
+    return "↕️ <b>Порядок кнопок</b>\nЖми ⬆️ и ⬇️, кнопки меняются местами сразу. Так же они стоят в меню у юзеров.", rows
+
+
+@action("iord", "links")
+async def act_order(ctx: Ctx, item_id: str, delta: str):
+    await move(ctx, "items", int(item_id), int(delta))
+    return "a:iord"
+
+
 # ---------- карточка ----------
 @view("item", "links")
 async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
@@ -70,10 +93,12 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
         return await view_items(ctx)
     app, db, t = ctx.app, ctx.app.db, now()
     k = item.id
+    row = await _row(ctx, k)
+    look = f"<b>Как выглядит</b>\n{label_info(row)}"
     if item.kind == "url":
-        html = (f"🌐 <b>{escape(item.label)}</b>\nОбычная ссылка: {escape(item.url or 'нет')}\n"
-                f"Статус: {'включена' if item.is_active else 'выключена'}")
-        rows = label_rows("item", str(k), await _row(ctx, k))
+        html = (f"🌐 {title_html(item)}\n{'✅ включена' if item.is_active else '⏸ выключена'}\n\n"
+                f"Ссылка: {escape(item.url or 'нет')}\n\n{look}")
+        rows = label_rows("item", str(k), row)
         rows.append([b("🌐 Изменить ссылку", f"x:iurl:{k}"), b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}")])
         rows += _common_rows(item)
         return html, rows
@@ -88,33 +113,35 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
     if not item.is_active:
         status = "⏸ выключена, юзеры её не видят"
     elif item.chat_id is None:
-        status = "🔌 чат не привязан - нажми 🔗 Привязать чат"
+        status = "🔌 чат не привязан, нажми 🔗 Привязать чат"
     elif not ready:
-        status = "⚠️ чат недоступен - нажми 🔄 Заменить чат"
+        status = "⚠️ чат недоступен, нажми 🔄 Заменить чат"
     else:
         status = "✅ работает"
     pool = app.links.pool_counts.get(k, 0)
     target = int(app.store.setting("pool_size", 5))
     html = (
-        f"🔗 <b>{escape(item.label)}</b>\n\n"
-        f"Статус: {status}\n"
+        f"🔗 {title_html(item)}\n{status}\n\n"
+        f"<b>Куда ведёт</b>\n"
         f"Чат: {chat_title(ctx, item.chat_id)}\n"
-        f"Режим: {MODES[item.mode]} - {MODE_HELP[item.mode]}\n"
-        f"Срок жизни ссылки: {minutes_text(item.ttl_minutes)}\n"
-        f"Спонсоры перед выдачей: {'нет' if item.skip_sponsors else 'да'}\n"
+        f"Тип ссылки: {MODES[item.mode]} ({MODE_HELP[item.mode]})\n"
+        f"Срок ссылки: {minutes_text(item.ttl_minutes)}\n"
+        f"Спонсоры перед выдачей: {'нет' if item.skip_sponsors else 'да'}\n\n"
+        f"{look}\n\n"
+        f"<b>Статистика</b>\n"
+        f"Выдано: сутки <b>{issued_day}</b>, 30 дней <b>{issued_month}</b>\n"
+        f"Вступили: сутки <b>{joined_day}</b>, всего <b>{joined_all}</b>\n"
         + (f"Готовых ссылок в запасе: {pool} из {target}\n" if target and ready else "")
-        + f"\n📊 Выдано: сутки <b>{issued_day}</b> · 30 дней <b>{issued_month}</b>\n"
-        f"✅ Вступили: сутки <b>{joined_day}</b> · всего <b>{joined_all}</b>\n\n"
-        f"📎 Прямая ссылка на кнопку (для постов):\n<code>https://t.me/{app.bot_username}?start=i{k}</code>"
+        + f"\n📎 Ссылка для постов:\n<code>https://t.me/{app.bot_username}?start=i{k}</code>"
     )
-    rows = label_rows("item", str(k), await _row(ctx, k))
+    rows = label_rows("item", str(k), row)
     rows.append([b("🔄 Заменить чат" if item.chat_id else "🔗 Привязать чат", f"a:bind:{k}",
                    "primary" if not ready else None)])
-    rows.append([b(f"🔁 {MODES[item.mode]}", f"x:imode:{k}"), b(f"⏱ {minutes_text(item.ttl_minutes)}", f"a:ittl:{k}")])
+    rows.append([b(f"🔁 Тип: {MODES[item.mode]}", f"x:imode:{k}"),
+                 b(f"⏱ Срок: {minutes_text(item.ttl_minutes)}", f"a:ittl:{k}")])
     rows.append([b(f"🤝 Спонсоры: {'нет' if item.skip_sponsors else 'да'}", f"x:isk:{k}"),
                  b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}")])
-    rows.append([b("🗑 Отозвать ссылки", f"a:irev:{k}")])
-    rows += _common_rows(item)
+    rows += _common_rows(item, revoke=True)
     return html, rows
 
 
@@ -122,12 +149,13 @@ async def _row(ctx: Ctx, item_id: int):
     return await ctx.app.db.fetchone("SELECT * FROM items WHERE id = ?", (item_id,))
 
 
-def _common_rows(item: Item) -> Rows:
+def _common_rows(item: Item, revoke: bool = False) -> Rows:
     k = item.id
+    last = [b("🗑 Отозвать ссылки", f"a:irev:{k}")] if revoke else []
     return [
-        [b("⬆️", f"x:imv:{k}:-1"), b("⬇️", f"x:imv:{k}:1"),
+        [b("⬆️ Выше", f"x:imv:{k}:-1"), b("⬇️ Ниже", f"x:imv:{k}:1"),
          b("⏸ Выключить" if item.is_active else "▶️ Включить", f"x:ion:{k}")],
-        [b("❌ Удалить", f"a:idel:{k}", "danger")],
+        last + [b("❌ Удалить", f"a:idel:{k}", "danger")],
         back_btn("a:items"),
     ]
 

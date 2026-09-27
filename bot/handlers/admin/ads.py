@@ -10,7 +10,7 @@ from ...richtext import html_to_plain, message_html, parse_contacts
 from ...services.ads import freq_text
 from ...store import PLACEMENTS, now
 from .core import (
-    Ctx, InputError, Rows, ViewResult, action, b, back_btn, fmt_date, has_media, on_input, save_media, snippet, view,
+    Ctx, InputError, Rows, ViewResult, action, b, back_btn, fmt_date, has_media, on_input, preview, save_media, style_name, view,
 )
 
 STATUS = {"active": "▶️ идёт", "paused": "⏸ на паузе", "draft": "📝 черновик", "finished": "🏁 завершена"}
@@ -152,11 +152,12 @@ async def view_ad(ctx: Ctx, ad_id: str) -> ViewResult:
         f"📅 До: {fmt_date(ad['ends_at'], tz) if ad['ends_at'] else 'без срока'}\n"
         f"🔁 Одному человеку: {freq_text(ad['freq_hours'])}\n"
         f"🔘 Кнопок: {len(buttons)}\n\n"
-        f"<blockquote>{snippet(ad['html'], 200)}</blockquote>"
+        f"<blockquote>{preview(ad['html'], 300)}</blockquote>"
     )
     if ad["status"] == "finished" and ad["finish_reason"]:
         html += f"\n🏁 {escape(ad['finish_reason'])}"
     k = ad["id"]
+    color = buttons[0][3] if buttons and len(buttons[0]) > 3 else None
     if ad["status"] == "active":
         run = b("⏸ Пауза", f"x:adrun:{k}:pause")
     elif ad["status"] == "finished":
@@ -169,8 +170,9 @@ async def view_ad(ctx: Ctx, ad_id: str) -> ViewResult:
         [b(f"👁 Лимит: {limit_text(ad['max_views'])}", f"a:adlim:{k}"),
          b(f"📅 Срок: {fmt_date(ad['ends_at'], tz)[:5] if ad['ends_at'] else '∞'}", f"a:adend:{k}")],
         [b(f"🔁 Частота: {freq_text(ad['freq_hours'])}", f"a:adfreq:{k}")],
-        [b("📝 Заменить пост", f"x:adpost:{k}"), b("🔘 Кнопки", f"x:adbtn:{k}")],
-        [b("✏️ Название", f"x:adttl:{k}"), b("📊 Отчёт", f"a:adrep:{k}")],
+        [b("🔘 Кнопки", f"x:adbtn:{k}"), b(f"🎨 Цвет кнопок: {style_name(color)}", f"x:adcol:{k}", color)],
+        [b("📝 Заменить пост", f"x:adpost:{k}"), b("✏️ Название", f"x:adttl:{k}")],
+        [b("📊 Отчёт", f"a:adrep:{k}")],
         [b("📑 Копия", f"x:adcopy:{k}"), b("🗑 Удалить", f"a:addel:{k}", "danger")],
         back_btn("a:ads"),
     ]
@@ -350,6 +352,27 @@ async def in_ad_buttons(ctx: Ctx, message: Message, ad_id: str):
                              (json.dumps(buttons, ensure_ascii=False), int(ad_id)))
     await ctx.reload()
     ctx.notice = f"✅ Кнопок: {len(buttons)}"
+    return f"a:ad:{ad_id}"
+
+
+@action("adcol", "ads")
+async def act_ad_color(ctx: Ctx, ad_id: str):
+    """Цвет всех кнопок рекламы: обычная → синяя → зелёная → красная."""
+    from ...store import STYLES
+    ad = await _ad(ctx, ad_id)
+    if ad is None:
+        return "a:ads"
+    buttons = json.loads(ad["buttons"])
+    if not buttons:
+        await ctx.toast("Сначала добавь кнопки.", alert=True)
+        return f"a:ad:{ad_id}"
+    cur = buttons[0][3] if len(buttons[0]) > 3 else None
+    new = STYLES[(STYLES.index(cur) + 1) % len(STYLES)] if cur in STYLES else STYLES[1]
+    for btn in buttons:
+        btn[2:] = [btn[2] if len(btn) > 2 else None, new]
+    await ctx.app.db.execute("UPDATE ads SET buttons = ? WHERE id = ?",
+                             (json.dumps(buttons, ensure_ascii=False), int(ad_id)))
+    await ctx.reload()
     return f"a:ad:{ad_id}"
 
 

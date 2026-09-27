@@ -328,6 +328,11 @@ class Ads(Base):
         self.assertEqual(last.markup.inline_keyboard[0][0].url, "https://t.me/best")
         self.assertEqual(app.store.ads[ad_id].views, 1)
 
+    async def test_ad_button_color(self):
+        ad_id = await self._make_ad()
+        await self.h.admin(f"x:adcol:{ad_id}")
+        self.assertEqual(self.app.store.ads[ad_id].buttons[0][3], "primary")
+
     async def test_frequency_once_and_limit(self):
         h, app, tg = self.h, self.app, self.tg
         ad_id = await self._make_ad()
@@ -380,8 +385,10 @@ class Admin(Base):
                    f"a:sptgt:{sp_id}", "a:bc", "a:stats", "a:users", f"a:user:{USER}", "a:banned:0", "a:cfg",
                    "a:texts", "a:btns", "a:btn:join", "a:col:btn:join", "a:set", "a:prot", "a:bak", "a:admins",
                    "a:log:0"]
-        from bot.handlers.admin.content import TEXTS
-        screens += [f"a:text:{k}" for k in TEXTS]
+        from bot.handlers.admin.content import GROUPS, TEXTS
+        from bot.handlers.admin.system import SETTING_GROUPS
+        screens += [f"a:text:{k}" for k in TEXTS] + [f"a:txg:{g}" for g in GROUPS]
+        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:iord"]
         for cb in screens:
             m = await h.admin(cb)
             self.assertNotIn("Ошибка", m.text or "", cb)
@@ -397,11 +404,26 @@ class Admin(Base):
         self.assertEqual((item.label, item.icon), ("Премиум", "5368324170671202286"))
         await h.admin(f"x:setsty:item:{item_id}:success")
         self.assertEqual(app.store.items[item_id].style, "success")
+        # в админке кнопка показана как у юзеров: с иконкой и цветом, иконка видна в карточке
+        listing = await h.admin("a:items")
+        btn = listing.markup.inline_keyboard[0][0]
+        self.assertEqual((btn.icon_custom_emoji_id, btn.style), ("5368324170671202286", "success"))
+        card = await h.admin(f"a:item:{item_id}")
+        self.assertIn('emoji-id="5368324170671202286"', card.text)
+        # порядок кнопок
+        await h.admin("x:iunew")
+        await h.send(OWNER, "Сайт | https://example.com")
+        second = max(app.store.items)
+        await h.admin(f"x:iord:{second}:-1")
+        self.assertEqual([i.id for i in app.store.menu], [second, item_id])
 
     async def test_edit_greeting_placeholders(self):
         h = self.h
         await h.admin("x:htm:text:start")
-        await h.send(OWNER, "Йо, {имя}! Твой id {id}")
+        await h.send(OWNER, "✨ Йо, {имя}! Твой id {id}",
+                     entities=[{"type": "custom_emoji", "offset": 0, "length": 1, "custom_emoji_id": "777"}])
+        screen = await h.admin("a:text:start")
+        self.assertIn('emoji-id="777"', screen.text, "премиум-эмодзи видно в админке")
         await h.send(USER, "/start")
         self.assertIn("Йо, U42! Твой id 42", h.user_screen(USER).text)
 
