@@ -1,4 +1,4 @@
-"""Кэш всего, что читают пользователи: настройки, тексты, кнопки, чаты, реклама, спонсоры.
+"""Кэш всего, что читают пользователи: настройки, тексты, кнопки, чаты, реклама.
 Пользовательские экраны строятся только из памяти. После правки в админке - `reload()` (миллисекунды)."""
 import json
 import time
@@ -56,10 +56,9 @@ class Item:
     mode: str           # one_time | request
     ttl_minutes: int
     url: str | None
-    wide: bool
-    skip_sponsors: bool
     is_active: bool
     broken: bool
+    row: int
     position: int
 
 
@@ -80,25 +79,6 @@ class Ad:
     started_at: int | None
 
 
-@dataclass(slots=True)
-class Sponsor:
-    id: int
-    chat_id: int
-    title: str
-    url: str
-    link_mode: str
-    target: int
-    joins: int
-    requests: int
-    ends_at: int | None
-    is_active: bool
-    position: int
-
-    @property
-    def progress(self) -> int:
-        return self.joins + (self.requests if self.link_mode == "request" else 0)
-
-
 @dataclass
 class Store:
     db: Database
@@ -108,13 +88,10 @@ class Store:
     chats: dict[int, Chat] = field(default_factory=dict)
     items: dict[int, Item] = field(default_factory=dict)
     ads: dict[int, Ad] = field(default_factory=dict)
-    sponsors: dict[int, Sponsor] = field(default_factory=dict)
     admins: dict[int, set[str]] = field(default_factory=dict)
     # готовые выборки
     menu: list[Item] = field(default_factory=list)
     active_ads: list[Ad] = field(default_factory=list)
-    active_sponsors: list[Sponsor] = field(default_factory=list)
-    sponsor_chats: dict[int, list[Sponsor]] = field(default_factory=dict)
 
     async def reload(self) -> None:
         db = self.db
@@ -128,9 +105,8 @@ class Store:
         }
         self.items = {
             r["id"]: Item(r["id"], r["kind"], r["label"], r["icon"], r["style"], r["chat_id"], r["mode"],
-                          r["ttl_minutes"], r["url"], bool(r["wide"]), bool(r["skip_sponsors"]),
-                          bool(r["is_active"]), bool(r["broken"]), r["position"])
-            for r in await db.fetchall("SELECT * FROM items ORDER BY position, id")
+                          r["ttl_minutes"], r["url"], bool(r["is_active"]), bool(r["broken"]), r["row"], r["position"])
+            for r in await db.fetchall("SELECT * FROM items ORDER BY row, position, id")
         }
         self.ads = {
             r["id"]: Ad(r["id"], r["title"], r["html"], r["media_id"], json.loads(r["buttons"]), r["status"],
@@ -139,11 +115,6 @@ class Store:
             for r in await db.fetchall("SELECT * FROM ads WHERE status != 'finished' OR finished_at > ? ORDER BY id",
                                        (now() - 90 * 86400,))
         }
-        self.sponsors = {
-            r["id"]: Sponsor(r["id"], r["chat_id"], r["title"], r["url"], r["link_mode"], r["target"], r["joins"],
-                             r["requests"], r["ends_at"], bool(r["is_active"]), r["position"])
-            for r in await db.fetchall("SELECT * FROM sponsors ORDER BY position, id")
-        }
         self.admins = {r["user_id"]: set(filter(None, r["perms"].split(",")))
                        for r in await db.fetchall("SELECT user_id, perms FROM admins")}
         self._build()
@@ -151,10 +122,6 @@ class Store:
     def _build(self) -> None:
         self.menu = [i for i in self.items.values() if i.is_active]
         self.active_ads = [a for a in self.ads.values() if a.status == "active"]
-        self.active_sponsors = [s for s in self.sponsors.values() if s.is_active and s.url]
-        self.sponsor_chats = {}
-        for s in self.sponsors.values():
-            self.sponsor_chats.setdefault(s.chat_id, []).append(s)
 
     # ---------- доступ ----------
     def setting(self, key: str, default: Any = 0) -> Any:

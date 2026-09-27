@@ -21,7 +21,6 @@ from .seed import apply_seed
 from .services.ads import AdService
 from .services.broadcast import Broadcaster
 from .services.links import LinkService
-from .services.sponsors import SponsorService
 from .store import Store
 from .telelog import TelegramLogHandler
 
@@ -42,7 +41,6 @@ async def setup(config: Config, bot: Bot) -> tuple[App, Dispatcher, GuardMiddlew
     app = App(config, db, store, media, bot, bot_username=me.username or "")
     app.links = LinkService(app)
     app.ads = AdService(app)
-    app.sponsors = SponsorService(app)
     app.broadcaster = Broadcaster(app)
     await app.load_users()
 

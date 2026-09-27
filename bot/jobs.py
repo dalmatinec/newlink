@@ -1,4 +1,4 @@
-"""Фоновые задачи: сброс буферов, отзыв протухших ссылок, сроки рекламы и спонсоров, бэкап."""
+"""Фоновые задачи: сброс буферов, отзыв протухших ссылок, сроки рекламы, бэкап."""
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
@@ -31,7 +31,6 @@ async def run_jobs(app: App, guard: GuardMiddleware) -> None:
                 guard.cleanup()
                 await app.links.cleanup()
                 await app.ads.check_schedule()
-                await app.sponsors.check_schedule()
                 await expire_bans(app)
                 await daily(app)
         except asyncio.CancelledError:

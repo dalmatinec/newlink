@@ -22,7 +22,7 @@ from bot.store import now
 from .fake_telegram import ChatMessage, FakeTelegram
 
 OWNER, USER, OTHER = 1, 42, 43
-CHAN, CHAN2, SPONSOR = -1001, -1002, -1003
+CHAN, CHAN2 = -1001, -1002
 _ids = itertools.count(1)
 
 ADMIN_RIGHTS = dict(
@@ -253,59 +253,6 @@ class LinkFlow(Base):
         self.assertIn(-1009, app.store.chats)
 
 
-class Sponsors(Base):
-    async def test_subscription_gate_and_goal(self):
-        h, app, tg = self.h, self.app, self.tg
-        item_id = await h.make_item()
-        await h.admin("a:spnew")
-        await h.bot_status(SPONSOR, title="Спонсор")
-        sponsor = next(iter(app.store.sponsors.values()))
-        self.assertEqual(sponsor.chat_id, SPONSOR)
-
-        await h.send(USER, "/start")
-        await h.click(USER, f"i:{item_id}")
-        screen = h.user_screen(USER)
-        self.assertIn("Подпишись", screen.text)
-        self.assertEqual(screen.markup.inline_keyboard[0][0].url, sponsor.url)
-
-        await h.click(USER, f"c:{item_id}")  # не подписался - остаёмся на экране спонсоров
-        self.assertIn("Подпишись", h.user_screen(USER).text)
-
-        tg.members.add((SPONSOR, USER))
-        await h.click(USER, f"c:{item_id}")
-        self.assertTrue(join_url(h.user_screen(USER)).startswith("https://t.me/+"))
-
-        await h.admin(f"x:sptgt:{sponsor.id}:1")
-        await h.joined(SPONSOR, OTHER, sponsor.url)
-        self.assertFalse(app.store.sponsors[sponsor.id].is_active, "цель набрана - спонсор выключается")
-        self.assertIn("Спонсор завершён", tg.last(OWNER).text)
-
-    async def test_request_counts_as_subscription(self):
-        h, app = self.h, self.app
-        item_id = await h.make_item()
-        await h.admin("a:spnew")
-        await h.bot_status(SPONSOR, title="Спонсор")
-        sponsor = next(iter(app.store.sponsors.values()))
-        await h.admin(f"x:spmode:{sponsor.id}")
-        sponsor = app.store.sponsors[sponsor.id]
-        self.assertEqual(sponsor.link_mode, "request")
-        await h.join_request(SPONSOR, USER, sponsor.url)
-        await h.send(USER, "/start")
-        await h.click(USER, f"i:{item_id}")
-        self.assertTrue(join_url(h.user_screen(USER)).startswith("https://t.me/+"))
-
-    async def test_skip_sponsors_per_item(self):
-        h = self.h
-        item_id = await h.make_item()
-        await h.admin("a:spnew")
-        await h.bot_status(SPONSOR, title="Спонсор")
-        more = await h.admin(f"x:isk:{item_id}:m")
-        self.assertIn("Ещё", more.text, "после переключения остаёмся на экране Ещё")
-        await h.send(USER, "/start")
-        await h.click(USER, f"i:{item_id}")
-        self.assertTrue(join_url(h.user_screen(USER)).startswith("https://t.me/+"))
-
-
 class Ads(Base):
     async def _make_ad(self) -> int:
         await self.h.admin("x:adnew")
@@ -377,20 +324,16 @@ class Admin(Base):
         await h.admin("x:adnew")
         await h.send(OWNER, "Реклама")
         ad_id = max(app.store.ads)
-        await h.admin("a:spnew")
-        await h.bot_status(SPONSOR, title="Спонсор")
-        sp_id = max(app.store.sponsors)
         screens = ["a:home", "a:items", "a:chats", f"a:item:{item_id}", f"a:item:{max(app.store.items)}",
                    f"a:bind:{item_id}", f"a:pick:{item_id}", f"a:ittl:{item_id}", f"a:irev:{item_id}",
                    f"a:idel:{item_id}", "a:ads", "a:adset", f"a:ad:{ad_id}", f"a:adlim:{ad_id}",
-                   f"a:adfreq:{ad_id}", f"a:adend:{ad_id}", f"a:adrep:{ad_id}", "a:sps", f"a:sp:{sp_id}",
-                   f"a:sptgt:{sp_id}", "a:bc", "a:stats", "a:users", f"a:user:{USER}", "a:banned:0", "a:cfg",
+                   f"a:adfreq:{ad_id}", f"a:adend:{ad_id}", f"a:adrep:{ad_id}", "a:bc", "a:stats", "a:users", f"a:user:{USER}", "a:banned:0", "a:cfg",
                    "a:texts", "a:btns", "a:btn:join", "a:col:btn:join", "a:set", "a:prot", "a:bak", "a:admins",
                    "a:log:0"]
         from bot.handlers.admin.content import GROUPS, TEXTS
         from bot.handlers.admin.system import SETTING_GROUPS
         screens += [f"a:text:{k}" for k in TEXTS] + [f"a:txg:{g}" for g in GROUPS]
-        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:iord", f"a:imore:{item_id}", f"a:admore:{ad_id}"]
+        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:lay", f"a:lay:{item_id}", f"a:imore:{item_id}", f"a:admore:{ad_id}"]
         for cb in screens:
             m = await h.admin(cb)
             self.assertNotIn("Ошибка", m.text or "", cb)
@@ -412,12 +355,13 @@ class Admin(Base):
         self.assertEqual((btn.icon_custom_emoji_id, btn.style), ("5368324170671202286", "success"))
         card = await h.admin(f"a:item:{item_id}")
         self.assertIn('emoji-id="5368324170671202286"', card.text)
-        # порядок кнопок
+        # новая кнопка встаёт отдельным рядом, стрелка вверх ставит её в ряд выше
         await h.admin("x:iunew")
         await h.send(OWNER, "Сайт | https://example.com")
         second = max(app.store.items)
-        await h.admin(f"x:iord:{second}:-1")
-        self.assertEqual([i.id for i in app.store.menu], [second, item_id])
+        await h.admin(f"x:laymv:{second}:up")
+        self.assertEqual([i.id for i in app.store.menu], [item_id, second])
+        self.assertEqual(app.store.items[second].row, app.store.items[item_id].row)
 
     async def test_edit_greeting_placeholders(self):
         h = self.h
@@ -473,6 +417,52 @@ class Admin(Base):
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         self.assertTrue(app.is_banned(USER))
+
+
+class Layout(Base):
+    async def test_rows_like_example_and_user_menu(self):
+        """2-2-2, последняя ⬆️ → 2-2-1-1, ещё ⬆️ → 2-3-1; у юзера меню такое же."""
+        h, app = self.h, self.app
+        ids = []
+        for n in range(6):
+            await h.admin("x:iunew")
+            await h.send(OWNER, f"B{n} | https://example.com/{n}")
+            ids.append(max(app.store.items))
+        grid = [[ids[0], ids[1]], [ids[2], ids[3]], [ids[4], ids[5]]]
+        await app.db.executemany("UPDATE items SET row = ?, position = ? WHERE id = ?",
+                                 [(r, p, i) for r, row in enumerate(grid) for p, i in enumerate(row)])
+        await app.reload()
+
+        def shape():
+            from bot.layout import grid_of
+            return [len(r) for r in grid_of(app.store.items.values())]
+
+        await h.admin(f"a:lay:{ids[5]}")
+        await h.admin(f"x:laymv:{ids[5]}:up")
+        self.assertEqual(shape(), [2, 2, 1, 1])
+        m = await h.admin(f"x:laymv:{ids[5]}:up")
+        self.assertEqual(shape(), [2, 3, 1])
+        self.assertEqual([len(r) for r in m.markup.inline_keyboard[:3]], [2, 3, 1], "админ сразу видит новое меню")
+        await h.admin(f"x:laymv:{ids[5]}:left")
+        self.assertEqual(app.store.items[ids[5]].position, 1)
+
+        await h.send(USER, "/start")
+        menu = h.user_screen(USER).markup.inline_keyboard
+        self.assertEqual([len(r) for r in menu], [2, 3, 1])
+        self.assertEqual(menu[1][1].url, "https://example.com/5")
+
+    async def test_old_per_row_layout_converted(self):
+        from bot.seed import convert_layout
+        db = self.app.db
+        for n in range(5):
+            await db.execute("INSERT INTO items(kind, label, url, wide, position, created_at) VALUES "
+                             "('url', ?, 'https://x.y', ?, ?, 0)", (f"B{n}", int(n == 2), n))
+        await db.execute("DELETE FROM settings WHERE key = 'layout_rows'")
+        await db.execute("INSERT OR REPLACE INTO settings(key, value) VALUES ('per_row', '2')")
+        await convert_layout(db)
+        await self.app.reload()
+        from bot.layout import grid_of
+        self.assertEqual([len(r) for r in grid_of(self.app.store.items.values())], [2, 1, 2])
 
 
 class Premium(Base):

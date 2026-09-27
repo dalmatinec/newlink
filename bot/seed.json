@@ -1,11 +1,8 @@
 {
   "settings": {
-    "per_row": 2,
     "pool_size": 5,
     "cleanup_hours": 24,
     "strict_requests": 1,
-    "sponsors_enabled": 1,
-    "sponsor_cache_minutes": 30,
     "ads_enabled": 1,
     "ad_gap_minutes": 10,
     "clean_chat": 1,
@@ -26,8 +23,6 @@
     "link_one_time": "🔗 <b>{кнопка}</b>\n\nТвоя личная ссылка готова. Она одноразовая - сработает только для тебя.",
     "link_request": "🔗 <b>{кнопка}</b>\n\nНажми Вступить и отправь заявку - она одобрится автоматически.",
     "link_ttl": "⏳ Ссылка действует ещё {время}.",
-    "sponsors": "📢 <b>Почти готово!</b>\n\nПодпишись на каналы ниже и нажми Я подписался - сразу выдам ссылку.",
-    "sponsors_missing": "Ты ещё не подписался на все каналы 🙈",
     "unavailable": "⏳ Этот раздел временно недоступен, загляни чуть позже.",
     "busy": "Сейчас очень много желающих, попробуй через минуту 🙏",
     "banned": "🚫 Доступ ограничен.",
@@ -35,8 +30,6 @@
   },
   "buttons": {
     "join": {"label": "🚀 Вступить", "style": "success"},
-    "back": {"label": "◀️ Назад"},
-    "check_subs": {"label": "✅ Я подписался", "style": "success"},
-    "sponsor": {"label": "➕ Подписаться", "style": "primary"}
+    "back": {"label": "◀️ Назад"}
   }
 }
