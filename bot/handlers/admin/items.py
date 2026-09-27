@@ -7,7 +7,8 @@ from ...richtext import normalize_url, parse_contacts, parse_label
 from ...store import Item, now
 from ...ui import button, minutes_text
 from .core import (
-    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, label_rows, move, on_input, view, yes_no,
+    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, label_rows, move, on_input, premium_notice,
+    view, yes_no,
 )
 
 MODES = {"one_time": "🔂 Одноразовая", "request": "📨 По заявке"}
@@ -175,6 +176,7 @@ async def in_item_new(ctx: Ctx, message: Message):
         raise InputError("Пустое название.")
     item_id = await _create(ctx, "invite", label, icon)
     await ctx.log("item.create", label)
+    ctx.notice = (await premium_notice(ctx, message)).strip()
     ctx.app.start_bind(ctx.user_id, "item", item_id)
     return f"a:bind:{item_id}"
 

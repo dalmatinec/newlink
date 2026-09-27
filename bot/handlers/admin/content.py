@@ -1,8 +1,12 @@
 """Админка: тексты экранов и системные кнопки, разложенные по разделам."""
 from html import escape
 
+from aiogram.types import Message
+
+from ... import premium
 from .core import (
-    Ctx, Rows, ViewResult, b, back_btn, label_info, label_rows, media_line, preview, rich_rows, view,
+    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, label_rows, media_line, on_input, preview,
+    rich_rows, view,
 )
 
 USER = {"имя": "имя", "полное_имя": "имя и фамилия", "юзернейм": "@юзернейм (если нет, то имя)",
@@ -52,6 +56,7 @@ def group_of(key: str) -> str:
 async def view_texts(ctx: Ctx) -> ViewResult:
     rows: Rows = [[b(title, f"a:txg:{g}")] for g, (title, _) in GROUPS.items()]
     rows.append([b("🔘 Кнопки бота", "a:btns")])
+    rows.append([b("✨ Проверить премиум-эмодзи", "x:prem")])
     rows.append(back_btn("a:cfg"))
     return ("📝 <b>Тексты и кнопки</b>\n\nВсё, что видит пользователь. Выбери раздел.\n"
             "Можно писать с форматированием и премиум-эмодзи."), rows
@@ -108,3 +113,19 @@ async def view_button(ctx: Ctx, key: str) -> ViewResult:
     rows = label_rows("btn", key, row)
     rows.append(back_btn("a:btns"))
     return html, rows
+
+
+@action("prem", "texts")
+async def act_premium_check(ctx: Ctx):
+    return await ctx.ask("prem", "✨ Пришли любое <b>премиум-эмодзи</b>. Бот проверит, показывает ли Telegram "
+                                 "премиум-эмодзи от этого бота в тексте и на кнопках.", "a:texts")
+
+
+@on_input("prem", "texts")
+async def in_premium_check(ctx: Ctx, message: Message):
+    ids = premium.custom_emoji_ids(message)
+    if not ids:
+        raise InputError("В сообщении нет премиум-эмодзи. Выбери эмодзи из премиум-набора.")
+    result = await premium.check(ctx.app.bot, ctx.chat_id, ids[0], force=True)
+    ctx.notice = premium.describe(result)
+    return "a:texts"

@@ -473,6 +473,30 @@ class Admin(Base):
         self.assertTrue(app.is_banned(USER))
 
 
+class Premium(Base):
+    EMOJI = [{"type": "custom_emoji", "offset": 0, "length": 1, "custom_emoji_id": "555"}]
+
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        from bot import premium
+        premium._cache.clear()
+
+    async def test_warns_when_telegram_strips_premium(self):
+        await self.h.admin("x:htm:text:start")
+        await self.h.send(OWNER, "✨ Привет", entities=self.EMOJI)
+        notice = self.h.screen(OWNER).text
+        self.assertIn("Telegram убирает премиум-эмодзи в тексте и на кнопках", notice)
+        self.assertIn("Premium", notice)
+        stored = await self.app.db.fetchval("SELECT html FROM texts WHERE key = 'start'")
+        self.assertIn('emoji-id="555"', stored, "эмодзи сохранены и появятся, когда Telegram разрешит")
+
+    async def test_manual_check_ok(self):
+        self.tg.premium_ok = True
+        await self.h.admin("x:prem")
+        await self.h.send(OWNER, "✨", entities=self.EMOJI)
+        self.assertIn("Telegram показывает премиум-эмодзи", self.h.screen(OWNER).text)
+
+
 class Seed(Base):
     async def test_old_default_texts_upgraded_custom_kept(self):
         from bot.seed import apply_seed, load_seed

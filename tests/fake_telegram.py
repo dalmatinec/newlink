@@ -42,6 +42,7 @@ class FakeTelegram(BaseSession):
     members: set[tuple[int, int]] = field(default_factory=set)   # (chat_id, user_id) - кто где состоит
     dead_chats: set[int] = field(default_factory=set)            # бот в этих чатах без прав
     flood_chats: set[int] = field(default_factory=set)           # тут Telegram просит подождать
+    premium_ok: bool = False  # может ли бот показывать премиум-эмодзи (как решает Telegram)
     approved: list[tuple[int, int]] = field(default_factory=list)
     declined: list[tuple[int, int]] = field(default_factory=list)
 
@@ -105,7 +106,8 @@ class FakeTelegram(BaseSession):
             del self.messages[key]
             return True
         if isinstance(method, SendMessage):
-            return self._store(bot, method.chat_id, "text", method.reply_markup, text=method.text)
+            msg = self._store(bot, method.chat_id, "text", method.reply_markup, text=method.text)
+            return self._premium_view(msg, method.text or "")
         if isinstance(method, (SendPhoto, SendAnimation, SendVideo, SendDocument)):
             kind, src = {
                 SendPhoto: ("photo", "photo"), SendAnimation: ("animation", "animation"),
@@ -163,6 +165,19 @@ class FakeTelegram(BaseSession):
         if isinstance(method, ForwardMessage):
             return self._store(bot, method.chat_id, "text", None, text="forward")
         raise NotImplementedError(type(method).__name__)
+
+    def _premium_view(self, msg: Message, text: str) -> Message:
+        """Как Telegram возвращает отправленное: с премиум-эмодзи или без них."""
+        data = msg.model_dump(exclude_none=True)
+        import re as _re
+        found = _re.search(r'emoji-id="(\d+)"', text)
+        if self.premium_ok and found:
+            data["entities"] = [{"type": "custom_emoji", "offset": 0, "length": 1, "custom_emoji_id": found[1]}]
+        if not self.premium_ok and "reply_markup" in data:
+            for row in data["reply_markup"]["inline_keyboard"]:
+                for btn in row:
+                    btn.pop("icon_custom_emoji_id", None)
+        return Message.model_validate(data, context={"bot": msg.bot})
 
     def _store(self, bot: Bot, chat_id: int, kind: str, markup: Any, text: str | None = None,
                caption: str | None = None, file_id: str | None = None) -> Message:
