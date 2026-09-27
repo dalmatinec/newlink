@@ -299,7 +299,8 @@ class Sponsors(Base):
         item_id = await h.make_item()
         await h.admin("a:spnew")
         await h.bot_status(SPONSOR, title="Спонсор")
-        await h.admin(f"x:isk:{item_id}")
+        more = await h.admin(f"x:isk:{item_id}:m")
+        self.assertIn("Ещё", more.text, "после переключения остаёмся на экране Ещё")
         await h.send(USER, "/start")
         await h.click(USER, f"i:{item_id}")
         self.assertTrue(join_url(h.user_screen(USER)).startswith("https://t.me/+"))
@@ -388,7 +389,7 @@ class Admin(Base):
         from bot.handlers.admin.content import GROUPS, TEXTS
         from bot.handlers.admin.system import SETTING_GROUPS
         screens += [f"a:text:{k}" for k in TEXTS] + [f"a:txg:{g}" for g in GROUPS]
-        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:iord"]
+        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:iord", f"a:imore:{item_id}"]
         for cb in screens:
             m = await h.admin(cb)
             self.assertNotIn("Ошибка", m.text or "", cb)

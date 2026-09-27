@@ -7,11 +7,12 @@ from ...richtext import normalize_url, parse_contacts, parse_label
 from ...store import Item, now
 from ...ui import button, minutes_text
 from .core import (
-    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, label_rows, move, on_input, premium_notice,
+    Ctx, InputError, Rows, ViewResult, action, b, back_btn, label_info, move, on_input, premium_notice, style_name,
     view, yes_no,
 )
 
 MODES = {"one_time": "🔂 Одноразовая", "request": "📨 По заявке"}
+MODE_SHORT = {"one_time": "Одноразовая", "request": "По заявке"}
 MODE_HELP = {
     "one_time": "ссылка на 1 вход, сгорает после использования",
     "request": "человек подаёт заявку, бот одобряет только владельца ссылки",
@@ -99,9 +100,10 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
     if item.kind == "url":
         html = (f"🌐 {title_html(item)}\n{'✅ включена' if item.is_active else '⏸ выключена'}\n\n"
                 f"Ссылка: {escape(item.url or 'нет')}\n\n{look}")
-        rows = label_rows("item", str(k), row)
-        rows.append([b("🌐 Изменить ссылку", f"x:iurl:{k}"), b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}")])
-        rows += _common_rows(item)
+        rows = _main_rows(item)
+        rows.append([b("🌐 Изменить ссылку", f"x:iurl:{k}")])
+        rows.append([b("⚙️ Ещё", f"a:imore:{k}")])
+        rows.append(back_btn("a:items"))
         return html, rows
 
     issued_day = await db.fetchval("SELECT COUNT(*) FROM invite_links WHERE item_id = ? AND assigned_at > ?",
@@ -135,30 +137,53 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
         + (f"Готовых ссылок в запасе: {pool} из {target}\n" if target and ready else "")
         + f"\n📎 Ссылка для постов:\n<code>https://t.me/{app.bot_username}?start=i{k}</code>"
     )
-    rows = label_rows("item", str(k), row)
+    rows = _main_rows(item)
     rows.append([b("🔄 Заменить чат" if item.chat_id else "🔗 Привязать чат", f"a:bind:{k}",
                    "primary" if not ready else None)])
-    rows.append([b(f"🔁 Тип: {MODES[item.mode]}", f"x:imode:{k}"),
+    rows.append([b(f"🔁 {MODE_SHORT[item.mode]}", f"x:imode:{k}"),
                  b(f"⏱ Срок: {minutes_text(item.ttl_minutes)}", f"a:ittl:{k}")])
-    rows.append([b(f"🤝 Спонсоры: {'нет' if item.skip_sponsors else 'да'}", f"x:isk:{k}"),
-                 b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}")])
-    rows += _common_rows(item, revoke=True)
+    rows.append([b("⚙️ Ещё", f"a:imore:{k}")])
+    rows.append(back_btn("a:items"))
     return html, rows
+
+
+def _main_rows(item: Item) -> Rows:
+    return [[b("✏️ Название", f"x:lbl:item:{item.id}"),
+             b(f"🎨 {style_name(item.style).capitalize()}", f"a:col:item:{item.id}", item.style)]]
+
+
+@view("imore", "links")
+async def view_item_more(ctx: Ctx, item_id: str) -> ViewResult:
+    item = item_or_none(ctx, item_id)
+    if item is None:
+        return await view_items(ctx)
+    k = item.id
+    rows: Rows = []
+    if item.kind == "invite":
+        rows.append([b(f"🤝 Спонсоры: {'нет' if item.skip_sponsors else 'да'}", f"x:isk:{k}:m"),
+                     b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}:m")])
+    else:
+        rows.append([b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}:m")])
+    rows.append([b("⬆️ Выше", f"x:imv:{k}:-1:m"), b("⬇️ Ниже", f"x:imv:{k}:1:m")])
+    rows.append([b("⏸ Выключить" if item.is_active else "▶️ Включить", f"x:ion:{k}:m")]
+                + ([b("✖️ Убрать иконку", f"x:inoico:{k}")] if item.icon else []))
+    if item.kind == "invite":
+        rows.append([b("🗑 Отозвать ссылки", f"a:irev:{k}")])
+    rows.append([b("❌ Удалить кнопку", f"a:idel:{k}", "danger")])
+    rows.append(back_btn(f"a:item:{k}"))
+    html = (f"⚙️ <b>Ещё: {escape(item.label)}</b>\n\n"
+            "🤝 <b>Спонсоры</b>: просить подписку перед выдачей ссылки.\n"
+            "↔️ <b>Широкая</b>: кнопка во всю ширину, отдельной строкой.")
+    return html, rows
+
+
+@action("inoico", "links")
+async def act_item_no_icon(ctx: Ctx, item_id: str):
+    return await _set(ctx, item_id, "m", icon=None)
 
 
 async def _row(ctx: Ctx, item_id: int):
     return await ctx.app.db.fetchone("SELECT * FROM items WHERE id = ?", (item_id,))
-
-
-def _common_rows(item: Item, revoke: bool = False) -> Rows:
-    k = item.id
-    last = [b("🗑 Отозвать ссылки", f"a:irev:{k}")] if revoke else []
-    return [
-        [b("⬆️ Выше", f"x:imv:{k}:-1"), b("⬇️ Ниже", f"x:imv:{k}:1"),
-         b("⏸ Выключить" if item.is_active else "▶️ Включить", f"x:ion:{k}")],
-        last + [b("❌ Удалить", f"a:idel:{k}", "danger")],
-        back_btn("a:items"),
-    ]
 
 
 # ---------- создание ----------
@@ -226,12 +251,12 @@ async def in_item_url(ctx: Ctx, message: Message, item_id: str):
 
 
 # ---------- настройки кнопки ----------
-async def _set(ctx: Ctx, item_id: str, **fields) -> str:
+async def _set(ctx: Ctx, item_id: str, back: str = "", **fields) -> str:
     cols = ", ".join(f"{c} = ?" for c in fields)
     await ctx.app.db.execute(f"UPDATE items SET {cols} WHERE id = ?", (*fields.values(), int(item_id)))
     await ctx.reload()
     ctx.app.links.wake.set()
-    return f"a:item:{item_id}"
+    return f"a:imore:{item_id}" if back == "m" else f"a:item:{item_id}"
 
 
 @action("imode", "links")
@@ -279,30 +304,30 @@ async def in_item_ttl(ctx: Ctx, message: Message, item_id: str):
 
 
 @action("isk", "links")
-async def act_item_skip(ctx: Ctx, item_id: str):
+async def act_item_skip(ctx: Ctx, item_id: str, back: str = ""):
     item = item_or_none(ctx, item_id)
-    return await _set(ctx, item_id, skip_sponsors=int(not item.skip_sponsors)) if item else "a:items"
+    return await _set(ctx, item_id, back, skip_sponsors=int(not item.skip_sponsors)) if item else "a:items"
 
 
 @action("iwide", "links")
-async def act_item_wide(ctx: Ctx, item_id: str):
+async def act_item_wide(ctx: Ctx, item_id: str, back: str = ""):
     item = item_or_none(ctx, item_id)
-    return await _set(ctx, item_id, wide=int(not item.wide)) if item else "a:items"
+    return await _set(ctx, item_id, back, wide=int(not item.wide)) if item else "a:items"
 
 
 @action("ion", "links")
-async def act_item_on(ctx: Ctx, item_id: str):
+async def act_item_on(ctx: Ctx, item_id: str, back: str = ""):
     item = item_or_none(ctx, item_id)
     if item is None:
         return "a:items"
     await ctx.log("item.toggle", f"{item.id}")
-    return await _set(ctx, item_id, is_active=int(not item.is_active))
+    return await _set(ctx, item_id, back, is_active=int(not item.is_active))
 
 
 @action("imv", "links")
-async def act_item_move(ctx: Ctx, item_id: str, delta: str):
+async def act_item_move(ctx: Ctx, item_id: str, delta: str, back: str = ""):
     await move(ctx, "items", int(item_id), int(delta))
-    return f"a:item:{item_id}"
+    return f"a:imore:{item_id}" if back == "m" else f"a:item:{item_id}"
 
 
 @view("irev", "links")
