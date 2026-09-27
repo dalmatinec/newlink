@@ -32,7 +32,7 @@ async def view_sponsors(ctx: Ctx) -> ViewResult:
     rows.append([b("🟢 Проверка подписки включена" if on else "🔴 Проверка подписки выключена", "x:spsw")])
     rows.append(back_btn("a:home"))
     html = ("🤝 <b>Спонсоры</b> (обязательная подписка)\n\n"
-            "Перед выдачей ссылки бот просит подписаться на активных спонсоров. Бот — админ в их каналах и выдаёт "
+            "Перед выдачей ссылки бот просит подписаться на активных спонсоров. Бот - админ в их каналах и выдаёт "
             "свою ссылку, поэтому точно считает, сколько людей пришло.\n\n"
             f"Активных: <b>{len(ctx.app.sponsors.active())}</b>")
     return html, rows
@@ -49,9 +49,9 @@ async def view_sponsor_new(ctx: Ctx) -> ViewResult:
     ctx.app.start_bind(ctx.user_id, "sponsor")
     base = f"https://t.me/{ctx.app.bot_username}"
     html = ("➕ <b>Новый спонсор</b>\n\n"
-            "Попроси владельца канала добавить бота админом (право «Приглашать пользователей»), "
+            "Попроси владельца канала добавить бота админом (право Приглашать пользователей), "
             "или добавь сам кнопкой ниже, если канал твой. Бот сам создаст спонсора и пришлёт подтверждение.\n\n"
-            "Жду 10 минут. Если бот уже админ в канале — выбери его из подключённых.")
+            "Жду 10 минут. Если бот уже админ в канале - выбери его из подключённых.")
     rows: Rows = [
         [button("➕ Добавить в канал", url=f"{base}?startchannel&admin=invite_users")],
         [button("➕ Добавить в группу", url=f"{base}?startgroup=sponsor&admin=invite_users")],
@@ -109,7 +109,7 @@ async def view_sponsor(ctx: Ctx, sponsor_id: str) -> ViewResult:
     chat = store.chats.get(s.chat_id)
     row = await ctx.app.db.fetchone("SELECT finish_reason FROM sponsors WHERE id = ?", (s.id,))
     state = "▶️ активен" if s.is_active else f"⏸ остановлен{f' ({escape(row[0])})' if row and row[0] else ''}"
-    html = (f"🤝 <b>{escape(s.title)}</b> — {state}\n\n"
+    html = (f"🤝 <b>{escape(s.title)}</b> - {state}\n\n"
             f"Канал: {escape(chat.title) if chat else s.chat_id}"
             f"{'' if chat is None or chat.can_invite else ' ⚠️ бот не админ'}\n"
             f"Ссылка: {escape(s.url)}\n"
@@ -136,7 +136,7 @@ async def act_sponsor_run(ctx: Ctx, sponsor_id: str):
     if s is None:
         return "a:sps"
     if not s.is_active and s.target and s.progress >= s.target:
-        await ctx.toast("Цель уже набрана — увеличь цель.", alert=True)
+        await ctx.toast("Цель уже набрана - увеличь цель.", alert=True)
         return f"a:sp:{sponsor_id}"
     await ctx.app.db.execute("UPDATE sponsors SET is_active = ?, finish_reason = NULL WHERE id = ?",
                              (int(not s.is_active), s.id))
@@ -175,7 +175,7 @@ async def act_sponsor_mode(ctx: Ctx, sponsor_id: str):
     ctx.app.links.revoke_queue.put_nowait((s.chat_id, s.url))
     await ctx.app.db.execute("UPDATE sponsors SET link_mode = ?, url = ? WHERE id = ?", (new, url, s.id))
     await ctx.reload()
-    ctx.notice = ("✅ Теперь поданная заявка считается подпиской. Одобрять заявки — на усмотрение владельца канала."
+    ctx.notice = ("✅ Теперь поданная заявка считается подпиской. Одобрять заявки - на усмотрение владельца канала."
                   if new == "request" else "✅ Обычная ссылка: засчитывается только вступление.")
     return f"a:sp:{sponsor_id}"
 
@@ -188,7 +188,7 @@ async def view_sponsor_target(ctx: Ctx, sponsor_id: str) -> ViewResult:
     rows = [btns[i:i + 3] for i in range(0, len(btns), 3)]
     rows.append([b("✍️ Своё число", f"x:sptgtin:{sponsor_id}")])
     rows.append(back_btn(f"a:sp:{sponsor_id}"))
-    return "🎯 <b>Цель по подпискам</b>\nКогда наберётся — спонсор отключится сам и придёт уведомление.", rows
+    return "🎯 <b>Цель по подпискам</b>\nКогда наберётся - спонсор отключится сам и придёт уведомление.", rows
 
 
 @action("sptgt", "sponsors")
@@ -200,7 +200,7 @@ async def act_sponsor_target(ctx: Ctx, sponsor_id: str, target: str):
 
 @action("sptgtin", "sponsors")
 async def act_sponsor_target_input(ctx: Ctx, sponsor_id: str):
-    return await ctx.ask("sptgt", "Сколько подписок нужно набрать? Пришли число (0 — без лимита).",
+    return await ctx.ask("sptgt", "Сколько подписок нужно набрать? Пришли число (0 - без лимита).",
                          f"a:sptgt:{sponsor_id}", sponsor_id)
 
 
@@ -215,7 +215,7 @@ async def in_sponsor_target(ctx: Ctx, message: Message, sponsor_id: str):
 @action("spend", "sponsors")
 async def act_sponsor_end(ctx: Ctx, sponsor_id: str):
     return await ctx.ask("spend", "📅 До какой даты держать спонсора? Пришли дату <code>31.12 18:00</code>, "
-                                  "число дней от сегодня или <code>0</code> — без срока.", f"a:sp:{sponsor_id}",
+                                  "число дней от сегодня или <code>0</code> - без срока.", f"a:sp:{sponsor_id}",
                          sponsor_id)
 
 

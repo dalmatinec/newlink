@@ -32,9 +32,9 @@ class Screen:
 
 @dataclass(slots=True)
 class PendingBind:
-    """Админ нажал «Привязать чат» и сейчас добавит бота в канал/группу."""
+    """Админ нажал Привязать чат и сейчас добавит бота в канал/группу."""
     kind: str      # item | sponsor
-    ref: int       # id кнопки (для спонсора — 0, он создаётся при добавлении)
+    ref: int       # id кнопки (для спонсора - 0, он создаётся при добавлении)
     until: int
 
 
@@ -63,7 +63,7 @@ class App:
                        for r in await self.db.fetchall("SELECT id, banned_until FROM users WHERE is_banned = 1")}
 
     async def reload(self) -> None:
-        """Перечитать кэш. Сначала сбрасываем буферы — иначе живые счётчики затрутся старыми из базы."""
+        """Перечитать кэш. Сначала сбрасываем буферы - иначе живые счётчики затрутся старыми из базы."""
         await self.flush()
         await self.store.reload()
 
@@ -112,7 +112,7 @@ class App:
         self._screen_ids[user_id] = message_id
 
     async def last_screen_id(self, user_id: int) -> int | None:
-        """Id прошлого экрана — из памяти или (после перезапуска) из базы."""
+        """Id прошлого экрана - из памяти или (после перезапуска) из базы."""
         if user_id in self.screens:
             return self.screens[user_id].message_id
         return await self.db.fetchval("SELECT screen_msg_id FROM users WHERE id = ?", (user_id,))

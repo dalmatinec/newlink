@@ -1,4 +1,4 @@
-"""Медиа хранятся оригиналами на диске, а file_id — отдельно для каждого бота.
+"""Медиа хранятся оригиналами на диске, а file_id - отдельно для каждого бота.
 Сменили токен → file_id нового бота ещё нет → файл заливается с диска, file_id запоминается.
 Нет ни file_id, ни файла → возвращаем None, вызывающий код покажет экран без медиа."""
 import asyncio
@@ -166,7 +166,7 @@ class MediaStore:
         if existing is not None:
             media_id = existing["id"]
             m = self.files[media_id]
-            if not m.path.exists():  # файл потерян — восстанавливаем из присланного
+            if not m.path.exists():  # файл потерян - восстанавливаем из присланного
                 await asyncio.to_thread(_write_atomic, m.path, data)
                 self._reported_missing.discard(media_id)
             return media_id
@@ -212,7 +212,7 @@ class MediaStore:
         return ok, failed
 
     async def set_kind(self, media_id: int, kind: str) -> None:
-        """Сменить способ отправки (видео ↔ GIF). Старые file_id другого типа не подойдут — сбрасываем."""
+        """Сменить способ отправки (видео ↔ GIF). Старые file_id другого типа не подойдут - сбрасываем."""
         m = self.files[media_id]
         m.kind = kind
         self.file_ids.pop(media_id, None)

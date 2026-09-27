@@ -15,7 +15,7 @@ from .journal import describe
 # ключ -> (название, минимум, максимум)
 SETTINGS = {
     "pool_size": ("⚡️ Готовых ссылок в запасе на кнопку", 0, 50),
-    "cleanup_hours": ("🧹 Отзывать неиспользованные ссылки через, ч (0 — нет)", 0, 720),
+    "cleanup_hours": ("🧹 Отзывать неиспользованные ссылки через, ч (0 - нет)", 0, 720),
     "sponsor_cache_minutes": ("🤝 Помнить проверку подписки, мин", 0, 1440),
     "tz_offset": ("🕒 Часовой пояс, UTC+", -12, 14),
     "backup_hour": ("💾 Час автобэкапа", 0, 23),
@@ -28,9 +28,9 @@ TOGGLES = {
     "log_admin_actions": "📜 Действия админов в канал логов",
 }
 PROTECTION = {
-    "flood_limit": ("Нажатий за окно (0 — выключить)", 0, 100),
+    "flood_limit": ("Нажатий за окно (0 - выключить)", 0, 100),
     "flood_window": ("Окно антифлуда, сек", 1, 60),
-    "flood_strikes": ("Нарушений до автобана (0 — без бана)", 0, 100),
+    "flood_strikes": ("Нарушений до автобана (0 - без бана)", 0, 100),
     "flood_ban_minutes": ("Автобан, минут", 0, 100000),
 }
 ALL_NUMBERS = {**SETTINGS, **PROTECTION}
@@ -58,7 +58,7 @@ async def view_stats(ctx: Ctx) -> ViewResult:
         f"{medals.get(i, f'{i}.')} {escape(store.items[r['item_id']].label) if r['item_id'] in store.items else '#' + str(r['item_id'])}"
         f" · <b>{r['n']}</b>" for i, r in enumerate(top, 1)) or "пока нет вступлений"
     ad_views = await count("SELECT COALESCE(SUM(views), 0) FROM ad_daily WHERE day = ?", app.ads.day())
-    conv = f"{joins[2] * 100 // issued[2]}%" if issued[2] else "—"
+    conv = f"{joins[2] * 100 // issued[2]}%" if issued[2] else "нет данных"
     html = (
         "📊 <b>Статистика</b> (сутки · неделя · месяц)\n\n"
         f"👥 Пользователей: <b>{await count('SELECT COUNT(*) FROM users')}</b>\n"
@@ -86,9 +86,9 @@ async def view_settings(ctx: Ctx) -> ViewResult:
     rows.insert(0, [b(f"📡 Канал логов: {ctx.app.log_chat or 'не задан'}", "x:logchat")])
     rows.append(back_btn("a:cfg"))
     html = ("⚙️ <b>Настройки</b>\n\n"
-            "⚡️ <b>Запас ссылок</b> — бот заранее создаёт ссылки, и юзер получает свою мгновенно. "
-            "5 хватает с головой; при больших наплывах можно поднять до 20–30.\n"
-            "📡 <b>Канал логов</b> — туда идут ошибки, бэкапы, отчёты рекламы и уведомления о сломанных чатах.")
+            "⚡️ <b>Запас ссылок</b> - бот заранее создаёт ссылки, и юзер получает свою мгновенно. "
+            "5 хватает с головой; при больших наплывах можно поднять до 20 - 30.\n"
+            "📡 <b>Канал логов</b> - туда идут ошибки, бэкапы, отчёты рекламы и уведомления о сломанных чатах.")
     return html, rows
 
 
@@ -98,8 +98,8 @@ async def view_protection(ctx: Ctx) -> ViewResult:
     rows: Rows = [[b(f"{title}: {s(key)}", f"x:setv:{key}:prot")] for key, (title, _, _) in PROTECTION.items()]
     rows.append(back_btn("a:cfg"))
     html = ("🛡 <b>Защита</b>\n\n"
-            f"Больше <b>{s('flood_limit')}</b> нажатий за <b>{s('flood_window')}</b> сек — бот просит не спешить. "
-            f"После <b>{s('flood_strikes')}</b> раз — бан на <b>{s('flood_ban_minutes')}</b> мин. На админов не действует.")
+            f"Больше <b>{s('flood_limit')}</b> нажатий за <b>{s('flood_window')}</b> сек - бот просит не спешить. "
+            f"После <b>{s('flood_strikes')}</b> раз - бан на <b>{s('flood_ban_minutes')}</b> мин. На админов не действует.")
     return html, rows
 
 
@@ -179,7 +179,7 @@ async def view_backup(ctx: Ctx) -> ViewResult:
 
 @action("bakgo", "backup")
 async def act_backup_now(ctx: Ctx):
-    await ctx.toast("Собираю архив…")
+    await ctx.toast("Собираю архив...")
     ctx.notice = await send_backup(ctx.app, "💾 Бэкап")
     await ctx.log("backup.create")
     return "a:bak"
@@ -191,7 +191,7 @@ async def act_backup_restore(ctx: Ctx):
         "bakrest",
         "⚠️ Текущие данные будут <b>заменены</b> данными из архива (копия текущей базы останется на сервере).\n\n"
         f"Пришлите zip-архив бэкапа файлом, до {TELEGRAM_DOWNLOAD_LIMIT // 1048576} МБ.\n"
-        "Архив больше — восстановите на сервере: <code>python -m bot.restore архив.zip</code>", "a:bak")
+        "Архив больше - восстановите на сервере: <code>python -m bot.restore архив.zip</code>", "a:bak")
 
 
 @on_input("bakrest", "backup")

@@ -40,7 +40,7 @@ class Harness:
         self.config = Config(bot_token="x", owner_ids=frozenset({OWNER}), data_dir=tmp, log_level="INFO")
 
     async def start(self) -> "Harness":
-        for router in (chats_router, admin_router, user_router):  # роутеры — модульные синглтоны
+        for router in (chats_router, admin_router, user_router):  # роутеры - модульные синглтоны
             router._parent_router = None
         admin_screens.clear()
         self.app, self.dp, self.guard = await setup(self.config, self.bot)
@@ -268,7 +268,7 @@ class Sponsors(Base):
         self.assertIn("Подпишись", screen.text)
         self.assertEqual(screen.markup.inline_keyboard[0][0].url, sponsor.url)
 
-        await h.click(USER, f"c:{item_id}")  # не подписался — остаёмся на экране спонсоров
+        await h.click(USER, f"c:{item_id}")  # не подписался - остаёмся на экране спонсоров
         self.assertIn("Подпишись", h.user_screen(USER).text)
 
         tg.members.add((SPONSOR, USER))
@@ -277,7 +277,7 @@ class Sponsors(Base):
 
         await h.admin(f"x:sptgt:{sponsor.id}:1")
         await h.joined(SPONSOR, OTHER, sponsor.url)
-        self.assertFalse(app.store.sponsors[sponsor.id].is_active, "цель набрана — спонсор выключается")
+        self.assertFalse(app.store.sponsors[sponsor.id].is_active, "цель набрана - спонсор выключается")
         self.assertIn("Спонсор завершён", tg.last(OWNER).text)
 
     async def test_request_counts_as_subscription(self):
@@ -349,7 +349,7 @@ class Ads(Base):
         h, app, tg = self.h, self.app, self.tg
         item_id = await h.make_item()
         ad_id = await self._make_ad()
-        await h.admin(f"x:adpl:{ad_id}:start")  # оставляем только «после ссылки»
+        await h.admin(f"x:adpl:{ad_id}:start")  # оставляем только после ссылки
         await h.admin(f"x:adrun:{ad_id}:start")
         await app.set_setting("ad_gap_minutes", 60)
         await h.send(USER, "/start")
@@ -449,6 +449,19 @@ class Admin(Base):
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         self.assertTrue(app.is_banned(USER))
+
+
+class Seed(Base):
+    async def test_old_default_texts_upgraded_custom_kept(self):
+        from bot.seed import apply_seed, load_seed
+        db, seed = self.app.db, load_seed()
+        old = seed["texts"]["link_request"].replace("Вступить", "\u00abВступить\u00bb").replace(" - ", " \u2014 ")
+        await db.execute("UPDATE texts SET html = ? WHERE key = 'link_request'", (old,))
+        await db.execute("UPDATE texts SET html = ? WHERE key = 'start'", ("Мой текст \u2014 свой",))
+        await apply_seed(db)
+        self.assertEqual(await db.fetchval("SELECT html FROM texts WHERE key = 'link_request'"),
+                         seed["texts"]["link_request"])
+        self.assertEqual(await db.fetchval("SELECT html FROM texts WHERE key = 'start'"), "Мой текст \u2014 свой")
 
 
 class Performance(Base):

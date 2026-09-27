@@ -62,7 +62,7 @@ async def daily(app: App) -> None:
 
 
 async def send_backup(app: App, caption: str) -> str:
-    """Бэкап на сервер (там лежат 3 последних) + копия в канал логов, а без канала — владельцам."""
+    """Бэкап на сервер (там лежат 3 последних) + копия в канал логов, а без канала - владельцам."""
     path = await make_backup(app)
     size = f"{path.stat().st_size / 1048576:.1f} МБ"
     on_server = f"На сервере: <code>{escape(str(path.parent.resolve()))}</code>"

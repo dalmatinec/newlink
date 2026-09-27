@@ -1,11 +1,10 @@
 """Инвайт-ссылки.
 
-Скорость: бот заранее держит по несколько готовых ссылок на каждую кнопку (пул). Нажатие кнопки —
-это один UPDATE в базе, без ожидания Telegram. Пул пополняется в фоне. Пустой пул — ссылка
+Скорость: бот заранее держит по несколько готовых ссылок на каждую кнопку (пул). Нажатие кнопки - это один UPDATE в базе, без ожидания Telegram. Пул пополняется в фоне. Пустой пул - ссылка
 создаётся на лету, как запасной вариант.
 
 Порядок: одна живая ссылка на человека и кнопку (повторное нажатие отдаёт ту же), после входа ссылка
-отзывается, протухшие и давно не использованные — тоже. Отзыв идёт фоновой очередью с паузами.
+отзывается, протухшие и давно не использованные - тоже. Отзыв идёт фоновой очередью с паузами.
 """
 import asyncio
 import logging
@@ -28,7 +27,7 @@ class LinkUnavailable(Exception):
 
 
 class LinkBusy(Exception):
-    """Флуд-контроль Telegram или сеть — стоит повторить чуть позже."""
+    """Флуд-контроль Telegram или сеть - стоит повторить чуть позже."""
 
 
 @dataclass(slots=True)
@@ -63,7 +62,7 @@ class LinkService:
             " AND user_id IS NULL AND revoked = 0 ORDER BY created_at LIMIT 1) RETURNING link",
             (user_id, t, expires, item.id, item.chat_id, item.mode),
         )
-        self.wake.set()  # пул стал меньше — пополнить
+        self.wake.set()  # пул стал меньше - пополнить
         if link:
             self.pool_counts[item.id] = max(0, self.pool_counts.get(item.id, 1) - 1)
             return Issued(link, expires)
@@ -146,7 +145,7 @@ class LinkService:
 
     # ---------- отзыв ----------
     async def revoke(self, where: str, params: tuple = ()) -> int:
-        """Отзывает живые ссылки по условию: сразу в базе, в Telegram — фоновой очередью."""
+        """Отзывает живые ссылки по условию: сразу в базе, в Telegram - фоновой очередью."""
         rows = await self.app.db.fetchall(
             f"SELECT link, chat_id FROM invite_links WHERE revoked = 0 AND used_at IS NULL AND ({where})", params)
         if rows:
@@ -198,7 +197,7 @@ class LinkService:
         return True
 
     async def owner_of(self, link: str) -> int | None:
-        """Кому выдана ссылка. None — ссылка не наша."""
+        """Кому выдана ссылка. None - ссылка не наша."""
         row = await self.app.db.fetchone("SELECT user_id FROM invite_links WHERE link = ?", (link,))
         return None if row is None else (row["user_id"] or 0)
 
@@ -223,9 +222,9 @@ class LinkService:
         if newly:
             chat = store.chats.get(chat_id)
             title = escape(chat.title if chat else str(chat_id))
-            names = ", ".join(f"«{escape(i.label)}»" for i in newly)
+            names = ", ".join(f"{escape(i.label)}" for i in newly)
             await self.app.alert(
-                f"⚠️ <b>Чат «{title}» недоступен</b> ({escape(reason)[:150]}).\n"
+                f"⚠️ <b>Чат {title} недоступен</b> ({escape(reason)[:150]}).\n"
                 f"Не работают кнопки: {names}.\n\n"
                 "Замени чат: /admin → 🔗 Кнопки → кнопка → 🔄 Заменить чат.",
                 perm="links",

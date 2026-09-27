@@ -1,5 +1,5 @@
 """Клавиатуры и показ экранов: редактируем текущее сообщение, где можно,
-иначе отправляем новое и удаляем старое — в личке всегда один экран бота."""
+иначе отправляем новое и удаляем старое - в личке всегда один экран бота."""
 import logging
 from html import escape
 from typing import Callable, Sequence, TypeVar
@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 T = TypeVar("T")
 BLANK = "⠀"  # Telegram не принимает пустой текст
 
-# {имя} и {name} — одно и то же: в админке удобнее писать по-русски
+# {имя} и {name} - одно и то же: в админке удобнее писать по-русски
 ALIASES = {"name": "имя", "full_name": "полное_имя", "username": "юзернейм", "mention": "упоминание",
            "id": "id", "button": "кнопка", "time": "время"}
 
@@ -48,7 +48,7 @@ def button(label: str, icon: str | None = None, style: str | None = None, *, cb:
 
 
 def sys_button(store: Store, key: str, *, cb: str | None = None, url: str | None = None) -> InlineKeyboardButton:
-    """Системная кнопка («Назад», «Вступить»…), редактируется в админке."""
+    """Системная кнопка (Назад, Вступить...), редактируется в админке."""
     b = store.button(key)
     return button(b.label, b.icon, b.style, cb=cb, url=url)
 
@@ -60,7 +60,7 @@ def item_button(item: Item) -> InlineKeyboardButton:
 
 
 def menu_rows(store: Store) -> list[list[InlineKeyboardButton]]:
-    """Главное меню: кнопки по N в ряд, «широкие» — отдельной строкой."""
+    """Главное меню: кнопки по N в ряд, широкие - отдельной строкой."""
     per_row = max(1, min(int(store.setting("per_row", 2)), 4))
     rows: list[list[InlineKeyboardButton]] = []
     current: list[InlineKeyboardButton] = []
@@ -113,7 +113,7 @@ async def show(
     app: App, user_id: int, chat_id: int, html: str, media_id: int | None,
     kb: InlineKeyboardMarkup | None, *, current: Screen | None = None,
 ) -> None:
-    """Показать экран. `current` — сообщение, которое можно отредактировать (обычно — нажатое)."""
+    """Показать экран. `current` - сообщение, которое можно отредактировать (обычно - нажатое)."""
     bot = app.bot
     media = app.media.get(media_id)
     html = html or BLANK

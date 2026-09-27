@@ -41,7 +41,7 @@ def _cut(text: str, entities: list[MessageEntity], start16: int, end16: int) -> 
 
 
 def parse_label(message: Message) -> tuple[str, str | None]:
-    """Подпись кнопки: первое премиум-эмодзи становится иконкой кнопки, остальное — текстом."""
+    """Подпись кнопки: первое премиум-эмодзи становится иконкой кнопки, остальное - текстом."""
     text = message.text or ""
     label, icon = _cut(text, list(message.entities or []), 0, len(_u16(text)) // 2)
     label = " ".join(label.split())
@@ -67,7 +67,7 @@ def normalize_url(raw: str) -> str | None:
 
 
 def parse_contacts(message: Message) -> tuple[list[tuple[str, str, str | None]], list[str]]:
-    """Строки вида «Текст кнопки | ссылка или @username». -> (контакты, ошибки)."""
+    """Строки вида Текст кнопки | ссылка или @username. -> (контакты, ошибки)."""
     text = message.text or ""
     entities = list(message.entities or [])
     contacts: list[tuple[str, str, str | None]] = []

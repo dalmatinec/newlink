@@ -75,7 +75,7 @@ class GuardMiddleware(BaseMiddleware):
     async def _reject(self, event: TelegramObject, html: str, alert: bool = False) -> None:
         try:
             if isinstance(event, CallbackQuery):
-                await event.answer(html_to_plain(html)[:190] or "…", show_alert=alert)
+                await event.answer(html_to_plain(html)[:190] or "...", show_alert=alert)
             elif isinstance(event, Message):
                 if (event.text or "").startswith("/start") and alert and html:
                     await event.answer(html)
