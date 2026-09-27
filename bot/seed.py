@@ -8,6 +8,12 @@ from pathlib import Path
 from .db import Database
 
 SEED_PATH = Path(__file__).with_name("seed.json")
+# прежние стандартные тексты: если в базе лежит один из них, он меняется на текущий из seed.json
+LEGACY_TEXTS = {
+    "link_request": [
+        "🔗 <b>{кнопка}</b>\n\nНажми Вступить и отправь заявку - она одобрится автоматически.",
+    ],
+}
 
 
 def load_seed() -> dict:
@@ -33,7 +39,9 @@ async def apply_seed(db: Database) -> None:
     # тексты, оставшиеся стандартными, приводим к новой версии
     for r in await db.fetchall("SELECT key, html FROM texts"):
         new = seed["texts"].get(r["key"])
-        if new is not None and r["html"] != new and _plain_typography(r["html"]) == new:
+        legacy = {_plain_typography(t) for t in LEGACY_TEXTS.get(r["key"], [])}
+        old = _plain_typography(r["html"])
+        if new is not None and r["html"] != new and (old == new or old in legacy):
             await db.execute("UPDATE texts SET html = ? WHERE key = ?", (new, r["key"]))
     for r in await db.fetchall("SELECT key, label FROM buttons"):
         new = seed["buttons"].get(r["key"], {}).get("label")
