@@ -427,11 +427,16 @@ class ChatHealth(Base):
     async def test_dead_unused_chat_disappears_bound_one_stays(self):
         h, app, tg = self.h, self.app, self.tg
         item_id = await h.make_item()               # кнопка в CHAN
+        await app.links.refill()                     # запас ссылок в CHAN
         await h.bot_status(CHAN2, title="Лишний")    # чат без кнопок
         self.assertIn(CHAN2, app.store.chats)
+        created, revoked = tg.links_created, len(tg.revoked)
 
-        tg.frozen_chats.update({CHAN, CHAN2})        # оба заморозили: Telegram молчит, но ссылки не создать
+        tg.frozen_chats.add(CHAN)                    # заморожен: Telegram молчит, но действовать нельзя
+        tg.dead_chats.add(CHAN2)                     # удалён
         await app.links.check_chats()
+        self.assertEqual((tg.links_created, len(tg.revoked)), (created, revoked),
+                         "проверка не создаёт и не отзывает ссылок")
         self.assertNotIn(CHAN2, app.store.chats, "мёртвый чат без кнопок пропал из списка")
         self.assertIn(CHAN, app.store.chats, "к этому чату привязана кнопка, он остаётся")
         self.assertFalse(app.store.item_ready(app.store.items[item_id]))
@@ -440,6 +445,7 @@ class ChatHealth(Base):
         self.assertNotIn("Лишний", str(picks.markup))
 
         tg.frozen_chats.clear()                      # разморозили
+        await app.links.refill()
         await app.links.check_chats()
         self.assertTrue(app.store.item_ready(app.store.items[item_id]), "ожил сам")
 
