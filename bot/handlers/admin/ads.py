@@ -14,6 +14,7 @@ from .core import (
     save_media, style_name, view,
 )
 
+PLACE_SHORT = {"start": "После /start", "link": "После ссылки"}
 STATUS = {"active": "▶️ идёт", "paused": "⏸ на паузе", "draft": "📝 черновик", "finished": "🏁 завершена"}
 LIMITS = [0, 1000, 3000, 5000, 10000, 25000, 50000, 100000]
 DAYS = [0, 1, 3, 7, 14, 30]
@@ -89,7 +90,7 @@ async def act_ad_new(ctx: Ctx):
 
 @action("adpost", "ads")
 async def act_ad_post(ctx: Ctx, ad_id: str):
-    return await ctx.ask("adpost", POST_HELP, f"a:ad:{ad_id}", ad_id)
+    return await ctx.ask("adpost", POST_HELP, f"a:admore:{ad_id}", ad_id)
 
 
 def _post_buttons(message: Message) -> list[list]:
@@ -129,7 +130,7 @@ async def in_ad_post(ctx: Ctx, message: Message, ad_id: str):
     await db.execute(f"UPDATE ads SET {cols} WHERE id = ?", (*fields.values(), int(ad_id)))
     await ctx.reload()
     ctx.notice = "✅ Пост обновлён" + await premium_notice(ctx, message)
-    return f"a:ad:{ad_id}"
+    return f"a:admore:{ad_id}"
 
 
 # ---------- карточка ----------
@@ -158,7 +159,6 @@ async def view_ad(ctx: Ctx, ad_id: str) -> ViewResult:
     if ad["status"] == "finished" and ad["finish_reason"]:
         html += f"\n🏁 {escape(ad['finish_reason'])}"
     k = ad["id"]
-    color = buttons[0][3] if buttons and len(buttons[0]) > 3 else None
     if ad["status"] == "active":
         run = b("⏸ Пауза", f"x:adrun:{k}:pause")
     elif ad["status"] == "finished":
@@ -167,16 +167,34 @@ async def view_ad(ctx: Ctx, ad_id: str) -> ViewResult:
         run = b("▶️ Запустить", f"x:adrun:{k}:start", "success")
     rows: Rows = [
         [b("👁 Предпросмотр", f"x:adprev:{k}"), run],
-        [b(("✅ " if p in places else "▫️ ") + name, f"x:adpl:{k}:{p}") for p, name in PLACEMENTS.items()],
+        [b(("✅ " if p in places else "▫️ ") + name, f"x:adpl:{k}:{p}") for p, name in PLACE_SHORT.items()],
         [b(f"👁 Лимит: {limit_text(ad['max_views'])}", f"a:adlim:{k}"),
          b(f"📅 Срок: {fmt_date(ad['ends_at'], tz)[:5] if ad['ends_at'] else '∞'}", f"a:adend:{k}")],
-        [b(f"🔁 Частота: {freq_text(ad['freq_hours'])}", f"a:adfreq:{k}")],
-        [b("🔘 Кнопки", f"x:adbtn:{k}"), b(f"🎨 Цвет кнопок: {style_name(color)}", f"x:adcol:{k}", color)],
-        [b("📝 Заменить пост", f"x:adpost:{k}"), b("✏️ Название", f"x:adttl:{k}")],
-        [b("📊 Отчёт", f"a:adrep:{k}")],
-        [b("📑 Копия", f"x:adcopy:{k}"), b("🗑 Удалить", f"a:addel:{k}", "danger")],
+        [b("📊 Отчёт", f"a:adrep:{k}"), b("⚙️ Ещё", f"a:admore:{k}")],
         back_btn("a:ads"),
     ]
+    return html, rows
+
+
+@view("admore", "ads")
+async def view_ad_more(ctx: Ctx, ad_id: str) -> ViewResult:
+    ad = await _ad(ctx, ad_id)
+    if ad is None:
+        return await view_ads(ctx)
+    k = ad["id"]
+    buttons = json.loads(ad["buttons"])
+    color = buttons[0][3] if buttons and len(buttons[0]) > 3 else None
+    rows: Rows = [
+        [b(f"🔁 Частота: {freq_text(ad['freq_hours'])}", f"a:adfreq:{k}")],
+        [b(f"🔘 Кнопки: {len(buttons)}", f"x:adbtn:{k}"), b(f"🎨 {style_name(color).capitalize()}", f"x:adcol:{k}:m", color)],
+        [b("📝 Заменить пост", f"x:adpost:{k}"), b("✏️ Название", f"x:adttl:{k}")],
+        [b("📑 Копия", f"x:adcopy:{k}"), b("🗑 Удалить", f"a:addel:{k}", "danger")],
+        back_btn(f"a:ad:{k}"),
+    ]
+    html = (f"⚙️ <b>Ещё: {escape(ad['title'])}</b>\n\n"
+            "🔁 <b>Частота</b>: как часто один человек видит эту рекламу.\n"
+            "🎨 <b>Цвет</b>: цвет кнопок под рекламой.\n"
+            "📑 <b>Копия</b>: новая реклама с тем же постом и нулевыми счётчиками.")
     return html, rows
 
 
@@ -248,7 +266,7 @@ async def view_ad_limit(ctx: Ctx, ad_id: str) -> ViewResult:
 async def view_ad_freq(ctx: Ctx, ad_id: str) -> ViewResult:
     ad = await _ad(ctx, ad_id)
     rows = _presets(FREQS, ad["freq_hours"], f"x:adset1:{ad_id}:freq_hours", freq_text)
-    rows.append(back_btn(f"a:ad:{ad_id}"))
+    rows.append(back_btn(f"a:admore:{ad_id}"))
     return ("🔁 <b>Как часто показывать одному человеку</b>\n"
             "Один раз - каждый увидит рекламу только однажды: максимум охвата разных людей."), rows
 
@@ -270,7 +288,7 @@ async def act_ad_set(ctx: Ctx, ad_id: str, field: str, value: str):
         return f"a:ad:{ad_id}"
     await ctx.app.db.execute(f"UPDATE ads SET {field} = ? WHERE id = ?", (int(value), int(ad_id)))
     await ctx.reload()
-    return f"a:ad:{ad_id}"
+    return f"a:admore:{ad_id}" if field == "freq_hours" else f"a:ad:{ad_id}"
 
 
 @action("adend", "ads")
@@ -335,7 +353,7 @@ async def act_ad_buttons(ctx: Ctx, ad_id: str):
         "🔘 <b>Кнопки рекламы</b>\nКаждая кнопка - отдельной строкой:\n"
         "<code>Перейти в канал | https://t.me/channel</code>\n<code>Сайт | https://site.com</code>\n\n"
         "Премиум-эмодзи в строке станет иконкой кнопки. Отправь <code>-</code>, чтобы убрать все кнопки.",
-        f"a:ad:{ad_id}", ad_id)
+        f"a:admore:{ad_id}", ad_id)
 
 
 @on_input("adbtn", "ads")
@@ -353,11 +371,11 @@ async def in_ad_buttons(ctx: Ctx, message: Message, ad_id: str):
                              (json.dumps(buttons, ensure_ascii=False), int(ad_id)))
     await ctx.reload()
     ctx.notice = f"✅ Кнопок: {len(buttons)}"
-    return f"a:ad:{ad_id}"
+    return f"a:admore:{ad_id}"
 
 
 @action("adcol", "ads")
-async def act_ad_color(ctx: Ctx, ad_id: str):
+async def act_ad_color(ctx: Ctx, ad_id: str, back: str = ""):
     """Цвет всех кнопок рекламы: обычная → синяя → зелёная → красная."""
     from ...store import STYLES
     ad = await _ad(ctx, ad_id)
@@ -366,7 +384,7 @@ async def act_ad_color(ctx: Ctx, ad_id: str):
     buttons = json.loads(ad["buttons"])
     if not buttons:
         await ctx.toast("Сначала добавь кнопки.", alert=True)
-        return f"a:ad:{ad_id}"
+        return f"a:admore:{ad_id}"
     cur = buttons[0][3] if len(buttons[0]) > 3 else None
     new = STYLES[(STYLES.index(cur) + 1) % len(STYLES)] if cur in STYLES else STYLES[1]
     for btn in buttons:
@@ -374,12 +392,12 @@ async def act_ad_color(ctx: Ctx, ad_id: str):
     await ctx.app.db.execute("UPDATE ads SET buttons = ? WHERE id = ?",
                              (json.dumps(buttons, ensure_ascii=False), int(ad_id)))
     await ctx.reload()
-    return f"a:ad:{ad_id}"
+    return f"a:admore:{ad_id}"
 
 
 @action("adttl", "ads")
 async def act_ad_title(ctx: Ctx, ad_id: str):
-    return await ctx.ask("adttl", "✏️ Название рекламы (видно только в админке и в отчёте):", f"a:ad:{ad_id}", ad_id)
+    return await ctx.ask("adttl", "✏️ Название рекламы (видно только в админке и в отчёте):", f"a:admore:{ad_id}", ad_id)
 
 
 @on_input("adttl", "ads")
@@ -389,7 +407,7 @@ async def in_ad_title(ctx: Ctx, message: Message, ad_id: str):
         raise InputError("Пустое название.")
     await ctx.app.db.execute("UPDATE ads SET title = ? WHERE id = ?", (title, int(ad_id)))
     await ctx.reload()
-    return f"a:ad:{ad_id}"
+    return f"a:admore:{ad_id}"
 
 
 @action("adcopy", "ads")
@@ -419,7 +437,7 @@ async def act_ad_report_send(ctx: Ctx, ad_id: str):
 @view("addel", "ads")
 async def view_ad_delete(ctx: Ctx, ad_id: str) -> ViewResult:
     return ("🗑 Удалить рекламу вместе со статистикой?",
-            [[b("🗑 Удалить", f"x:addel:{ad_id}", "danger"), b("✖️ Отмена", f"a:ad:{ad_id}")]])
+            [[b("🗑 Удалить", f"x:addel:{ad_id}", "danger"), b("✖️ Отмена", f"a:admore:{ad_id}")]])
 
 
 @action("addel", "ads")

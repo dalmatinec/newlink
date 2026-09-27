@@ -331,7 +331,8 @@ class Ads(Base):
 
     async def test_ad_button_color(self):
         ad_id = await self._make_ad()
-        await self.h.admin(f"x:adcol:{ad_id}")
+        more = await self.h.admin(f"x:adcol:{ad_id}:m")
+        self.assertIn("Ещё", more.text)
         self.assertEqual(self.app.store.ads[ad_id].buttons[0][3], "primary")
 
     async def test_frequency_once_and_limit(self):
@@ -389,7 +390,7 @@ class Admin(Base):
         from bot.handlers.admin.content import GROUPS, TEXTS
         from bot.handlers.admin.system import SETTING_GROUPS
         screens += [f"a:text:{k}" for k in TEXTS] + [f"a:txg:{g}" for g in GROUPS]
-        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:iord", f"a:imore:{item_id}"]
+        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:iord", f"a:imore:{item_id}", f"a:admore:{ad_id}"]
         for cb in screens:
             m = await h.admin(cb)
             self.assertNotIn("Ошибка", m.text or "", cb)
