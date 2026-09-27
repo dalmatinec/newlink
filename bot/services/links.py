@@ -230,8 +230,19 @@ class LinkService:
         await self.chat_failed(chat_id, reason)
         await self.forget_if_dead(chat_id)
 
+    async def _touch_link(self, chat_id: int) -> None:
+        """Пересохраняет одну живую ссылку бота в чате без изменений: новых ссылок не появляется."""
+        row = await self.app.db.fetchone(
+            "SELECT link, item_id FROM invite_links WHERE chat_id = ? AND revoked = 0 AND used_at IS NULL LIMIT 1",
+            (chat_id,))
+        if row is None:
+            return
+        item = self.app.store.items.get(row["item_id"])
+        await self.app.bot.edit_chat_invite_link(chat_id, row["link"], name=item.label[:32] if item else None)
+
     async def check_chats(self) -> None:
-        """Проверка всех чатов настоящим действием: создать и сразу отозвать ссылку.
+        """Проверка всех чатов без создания новых ссылок: есть ли бот и права, а в чатах с запасом ссылок
+        ещё и настоящее действие: пересохранить одну готовую ссылку с тем же названием.
         Так ловятся и удалённые, и замороженные чаты, о которых Telegram ничего не присылает.
         Сбои сети и сервера Telegram чат мёртвым не делают: проверим в следующий раз."""
         bot = self.app.bot
@@ -247,8 +258,7 @@ class LinkService:
                                                   (chat.id,))
                         await self.chat_failed(chat.id, "у бота нет права Приглашать пользователей")
                     continue
-                probe = await bot.create_chat_invite_link(chat.id, name="проверка бота", member_limit=1)
-                await bot.revoke_chat_invite_link(chat.id, probe.invite_link)
+                await self._touch_link(chat.id)
             except TelegramRetryAfter as e:
                 await asyncio.sleep(e.retry_after + 1)
                 continue

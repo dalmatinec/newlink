@@ -8,6 +8,7 @@ from aiogram.client.session.base import BaseSession
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.methods import (
     AnswerCallbackQuery, ApproveChatJoinRequest, CopyMessage, CreateChatInviteLink, DeclineChatJoinRequest, DeleteMessage,
+    EditChatInviteLink,
     EditMessageMedia, EditMessageText, ForwardMessage, GetChatMember, GetFile, GetMe, RevokeChatInviteLink,
     SendAnimation, SendDocument, SendMessage, SendPhoto, SendVideo, SetMyCommands, TelegramMethod,
 )
@@ -147,6 +148,11 @@ class FakeTelegram(BaseSession):
                                   creates_join_request=bool(method.creates_join_request), is_primary=False,
                                   is_revoked=False, name=method.name, member_limit=method.member_limit,
                                   expire_date=method.expire_date)
+        if isinstance(method, EditChatInviteLink):
+            if method.chat_id in self.dead_chats or method.chat_id in self.frozen_chats:
+                raise TelegramBadRequest(method, "Bad Request: CHAT_ADMIN_REQUIRED")
+            return ChatInviteLink(invite_link=method.invite_link, creator=User(id=self.bot_id, is_bot=True,
+                                  first_name="Links"), creates_join_request=False, is_primary=False, is_revoked=False)
         if isinstance(method, RevokeChatInviteLink):
             self.revoked.append(method.invite_link)
             return ChatInviteLink(invite_link=method.invite_link, creator=User(id=self.bot_id, is_bot=True,
