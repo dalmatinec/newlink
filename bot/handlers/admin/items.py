@@ -436,21 +436,28 @@ async def act_bind_to(ctx: Ctx, item_id: str, chat_id: str):
 async def view_chats(ctx: Ctx) -> ViewResult:
     store = ctx.app.store
     lines = []
-    rows: Rows = []
     for c in sorted(store.chats.values(), key=lambda c: (not c.is_present, c.title.lower())):
-        state = "✅ админ" if c.can_invite else ("⚠️ нет права приглашать" if c.is_present else "🚪 бота убрали")
+        if c.can_invite and c.is_present:
+            state = "✅ работает"
+        elif c.is_present:
+            state = "⚠️ нет права приглашать"
+        else:
+            state = "🚪 недоступен"
         used = [i.label for i in store.items.values() if i.chat_id == c.id]
-        lines.append(f"{'📢' if c.type == 'channel' else '👥'} <b>{escape(c.title)}</b> - {state}"
-                     + (f"\n   ↳ {escape(', '.join(used))}" if used else ""))
-        if not c.is_present and not used:
-            rows.append([b(f"🧹 Забыть {c.title[:30]}", f"x:chforget:{c.id}")])
-    rows.append(back_btn("a:items"))
-    html = "🔌 <b>Чаты бота</b>\n\n" + ("\n".join(lines) or "Бот пока ни в одном чате.")
+        lines.append(f"{'📢' if c.type == 'channel' else '👥'} <b>{escape(c.title)}</b>: {state}"
+                     + (f"\n   кнопки: {escape(', '.join(used))}" if used else ""))
+    rows: Rows = [[b("🔄 Проверить сейчас", "x:chcheck")], back_btn("a:items")]
+    html = ("🔌 <b>Чаты бота</b>\n\n" + ("\n".join(lines) or "Бот пока ни в одном чате.")
+            + "\n\nНовые чаты появляются сами, когда бота добавляют админом. Бот проверяет чаты каждые 15 минут: "
+            "удалённые и замороженные сами пропадают из списка. Если к мёртвому чату привязана кнопка, "
+            "он остаётся здесь, пока не заменишь чат у кнопки.")
     return html, rows
 
 
-@action("chforget", "links")
-async def act_chat_forget(ctx: Ctx, chat_id: str):
-    await ctx.app.db.execute("DELETE FROM chats WHERE id = ? AND is_present = 0", (int(chat_id),))
-    await ctx.reload()
+@action("chcheck", "links")
+async def act_chats_check(ctx: Ctx):
+    await ctx.toast("Проверяю чаты...")
+    await ctx.app.links.check_chats()
+    ctx.notice = "✅ Проверка закончена"
     return "a:chats"
+

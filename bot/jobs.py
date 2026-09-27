@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 
 TICK = 30
 MAINTENANCE_EVERY = 60
+CHAT_CHECK_EVERY = 15 * 60
 LOG_KEEP_DAYS = 90
 SEND_LIMIT = 49 * 1024 * 1024  # бот может отправить файл до 50 МБ
 
@@ -33,6 +34,8 @@ async def run_jobs(app: App, guard: GuardMiddleware) -> None:
                 await app.ads.check_schedule()
                 await expire_bans(app)
                 await daily(app)
+            if ticks % CHAT_CHECK_EVERY == 0:
+                await app.links.check_chats()
         except asyncio.CancelledError:
             raise
         except Exception:

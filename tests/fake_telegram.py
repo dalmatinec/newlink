@@ -13,7 +13,8 @@ from aiogram.methods import (
 )
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from aiogram.types import (
-    BufferedInputFile, ChatInviteLink, ChatMemberLeft, ChatMemberMember, File, InputFile, Message, User,
+    BufferedInputFile, ChatInviteLink, ChatMemberAdministrator, ChatMemberLeft, ChatMemberMember, File, InputFile,
+    Message, User,
 )
 
 
@@ -42,6 +43,7 @@ class FakeTelegram(BaseSession):
     members: set[tuple[int, int]] = field(default_factory=set)   # (chat_id, user_id) - кто где состоит
     dead_chats: set[int] = field(default_factory=set)            # бот в этих чатах без прав
     flood_chats: set[int] = field(default_factory=set)           # тут Telegram просит подождать
+    frozen_chats: set[int] = field(default_factory=set)          # бот вроде админ, но делать ничего нельзя
     premium_ok: bool = False  # может ли бот показывать премиум-эмодзи (как решает Telegram)
     approved: list[tuple[int, int]] = field(default_factory=list)
     declined: list[tuple[int, int]] = field(default_factory=list)
@@ -137,7 +139,7 @@ class FakeTelegram(BaseSession):
         if isinstance(method, CreateChatInviteLink):
             if method.chat_id in self.flood_chats:
                 raise TelegramRetryAfter(method, "Too Many Requests", retry_after=3)
-            if method.chat_id in self.dead_chats:
+            if method.chat_id in self.dead_chats or method.chat_id in self.frozen_chats:
                 raise TelegramBadRequest(method, "Bad Request: not enough rights to manage chat invite link")
             self.links_created += 1
             return ChatInviteLink(invite_link=f"https://t.me/+L{method.chat_id}x{self.links_created}",
@@ -153,6 +155,13 @@ class FakeTelegram(BaseSession):
             if method.chat_id in self.dead_chats:
                 raise TelegramForbiddenError(method, "Forbidden: bot is not a member of the channel chat")
             user = User(id=method.user_id, is_bot=False, first_name="U")
+            if method.user_id == self.bot_id:
+                return ChatMemberAdministrator(
+                    user=User(id=self.bot_id, is_bot=True, first_name="Links"), can_be_edited=False,
+                    is_anonymous=False, can_manage_chat=True, can_delete_messages=False, can_manage_video_chats=False,
+                    can_restrict_members=False, can_promote_members=False, can_change_info=False,
+                    can_invite_users=True, can_post_stories=False, can_edit_stories=False, can_delete_stories=False,
+                    can_send_welcome_messages=False)
             if (method.chat_id, method.user_id) in self.members:
                 return ChatMemberMember(user=user)
             return ChatMemberLeft(user=user)

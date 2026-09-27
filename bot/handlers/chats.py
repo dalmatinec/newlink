@@ -57,6 +57,8 @@ async def bot_status(event: ChatMemberUpdated, app: App) -> None:
     if not can_invite:
         reason = "бота убрали из чата" if not present else "у бота нет права Приглашать пользователей"
         await app.links.chat_failed(chat.id, reason)
+        if not present:
+            await app.links.forget_if_dead(chat.id)
         if pending and present and new.status != ChatMemberStatus.MEMBER:
             await _tell(app, actor.id, f"Я в {t}, но без права Приглашать пользователей. Выдай его - и привяжусь.")
         return  # статус member: права обычно приходят следующим событием
