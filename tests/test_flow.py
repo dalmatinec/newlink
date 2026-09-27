@@ -2,7 +2,6 @@
 Запуск: python -m unittest -v   (или python -m pytest -q, если он установлен)"""
 import asyncio
 import itertools
-import json
 import tempfile
 import unittest
 from pathlib import Path
