@@ -253,7 +253,7 @@ async def on_admin_input(message: Message, state: FSMContext, app: App, perms: s
 
 # ---------- общие элементы экранов ----------
 async def premium_notice(ctx: "Ctx", message: Message) -> str:
-    """Если в сообщении есть премиум-эмодзи — проверить, покажет ли их Telegram, и предупредить."""
+    """Если в сообщении есть премиум-эмодзи, проверить, покажет ли их Telegram, и предупредить."""
     ids = premium.custom_emoji_ids(message)
     if not ids:
         return ""
