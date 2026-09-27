@@ -1,4 +1,4 @@
-"""Ошибки из логов — в канал логов. Одинаковые ошибки не спамят: повтор не чаще раза в 10 минут."""
+"""Ошибки из логов - в канал логов. Одинаковые ошибки не спамят: повтор не чаще раза в 10 минут."""
 import asyncio
 import logging
 import time
@@ -23,7 +23,7 @@ class TelegramLogHandler(logging.Handler):
             return
         try:
             self.loop.call_soon_threadsafe(self._put, record)
-        except RuntimeError:  # цикл уже закрыт — при остановке
+        except RuntimeError:  # цикл уже закрыт - при остановке
             pass
 
     def _put(self, record: logging.LogRecord) -> None:

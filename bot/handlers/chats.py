@@ -55,21 +55,21 @@ async def bot_status(event: ChatMemberUpdated, app: App) -> None:
     t = escape(title)
 
     if not can_invite:
-        reason = "бота убрали из чата" if not present else "у бота нет права «Приглашать пользователей»"
+        reason = "бота убрали из чата" if not present else "у бота нет права Приглашать пользователей"
         await app.links.chat_failed(chat.id, reason)
         if not present and app.store.sponsor_chats.get(chat.id):
-            names = ", ".join(f"«{escape(s.title)}»" for s in app.store.sponsor_chats[chat.id] if s.is_active)
+            names = ", ".join(f"{escape(s.title)}" for s in app.store.sponsor_chats[chat.id] if s.is_active)
             if names:
                 await app.alert(f"⚠️ Бота убрали из канала спонсора {names}: подписку на него проверить нельзя.",
                                 perm="sponsors")
         if pending and present and new.status != ChatMemberStatus.MEMBER:
-            await _tell(app, actor.id, f"Я в «{t}», но без права «Приглашать пользователей». Выдай его — и привяжусь.")
+            await _tell(app, actor.id, f"Я в {t}, но без права Приглашать пользователей. Выдай его - и привяжусь.")
         return  # статус member: права обычно приходят следующим событием
 
     await app.links.chat_restored(chat.id)
     if pending is None:
         if is_admin:
-            await _tell(app, actor.id, f"✅ Я админ в «{t}».\nПривязать к кнопке: /admin → 🔗 Кнопки → кнопка → "
+            await _tell(app, actor.id, f"✅ Я админ в {t}.\nПривязать к кнопке: /admin → 🔗 Кнопки → кнопка → "
                                        "🔄 Чат → 📋 Выбрать из подключённых.")
         return
 
@@ -78,14 +78,14 @@ async def bot_status(event: ChatMemberUpdated, app: App) -> None:
         await app.links.bind(pending.ref, chat.id)
         item = app.store.items[pending.ref]
         await app.log_action(actor.id, "item.bind", f"{item.id}: {title}",
-                             f"{escape(actor.first_name or str(actor.id))}: кнопка «{escape(item.label)}» → «{t}»")
-        await _tell(app, actor.id, f"✅ Кнопка «{escape(item.label)}» теперь ведёт в «{t}».",
+                             f"{escape(actor.first_name or str(actor.id))}: кнопка {escape(item.label)} → {t}")
+        await _tell(app, actor.id, f"✅ Кнопка {escape(item.label)} теперь ведёт в {t}.",
                     f"a:item:{item.id}", "🔗 Открыть кнопку")
     elif pending.kind == "sponsor":
         try:
             url = await app.sponsors.create_link(chat.id, "plain")
         except TelegramAPIError as e:
-            await _tell(app, actor.id, f"Не получилось создать ссылку в «{t}»: {escape(str(e))[:200]}")
+            await _tell(app, actor.id, f"Не получилось создать ссылку в {t}: {escape(str(e))[:200]}")
             return
         pos = await app.db.fetchval("SELECT COALESCE(MAX(position), 0) + 1 FROM sponsors")
         sponsor_id = await app.db.execute(
@@ -93,8 +93,8 @@ async def bot_status(event: ChatMemberUpdated, app: App) -> None:
             (chat.id, title, url, pos, now()))
         await app.reload()
         await app.log_action(actor.id, "sponsor.create", title,
-                             f"{escape(actor.first_name or str(actor.id))}: добавил спонсора «{t}»")
-        await _tell(app, actor.id, f"✅ Спонсор «{t}» добавлен и уже работает.",
+                             f"{escape(actor.first_name or str(actor.id))}: добавил спонсора {t}")
+        await _tell(app, actor.id, f"✅ Спонсор {t} добавлен и уже работает.",
                     f"a:sp:{sponsor_id}", "🤝 Открыть спонсора")
 
 
@@ -116,7 +116,7 @@ async def join_request(req: ChatJoinRequest, app: App) -> None:
     owner = await app.links.owner_of(link)
     if owner is None:
         await app.sponsors.on_request(req.chat.id, link, req.from_user.id)
-        return  # не наша ссылка — решают админы чата
+        return  # не наша ссылка - решают админы чата
     try:
         if app.store.setting("strict_requests", 1) and owner and owner != req.from_user.id:
             await req.decline()  # ссылку переслали другому
@@ -128,7 +128,7 @@ async def join_request(req: ChatJoinRequest, app: App) -> None:
 
 @router.message(F.migrate_to_chat_id)
 async def group_migrated(message: Message, app: App) -> None:
-    """Группа стала супергруппой — у неё новый id, переносим привязки."""
+    """Группа стала супергруппой - у неё новый id, переносим привязки."""
     old, new = message.chat.id, message.migrate_to_chat_id
     await app.db.execute(
         "INSERT OR REPLACE INTO chats(id, title, type, username, can_invite, is_present, updated_at) "

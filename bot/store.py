@@ -1,5 +1,5 @@
 """Кэш всего, что читают пользователи: настройки, тексты, кнопки, чаты, реклама, спонсоры.
-Пользовательские экраны строятся только из памяти. После правки в админке — `reload()` (миллисекунды)."""
+Пользовательские экраны строятся только из памяти. После правки в админке - `reload()` (миллисекунды)."""
 import json
 import time
 from dataclasses import dataclass, field
@@ -174,7 +174,7 @@ class Store:
         return bool(chat and chat.can_invite and chat.is_present and not item.broken)
 
     def perms_of(self, user_id: int, owners: frozenset[int]) -> set[str] | None:
-        """None — не админ. Владельцы из .env имеют все права."""
+        """None - не админ. Владельцы из .env имеют все права."""
         if user_id in owners:
             return {"*"}
         return self.admins.get(user_id)

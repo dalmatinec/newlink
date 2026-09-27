@@ -51,7 +51,7 @@ async def view_items(ctx: Ctx) -> ViewResult:
     rows.append(back_btn("a:home"))
     html = ("🔗 <b>Кнопки меню</b>\n\n"
             "✅ работает · ⚠️ чат недоступен · 🔌 чат не привязан · 🌐 обычная ссылка · ⏸ выключена\n\n"
-            + ("Нажми на кнопку, чтобы настроить её." if items else "Кнопок пока нет — создай первую."))
+            + ("Нажми на кнопку, чтобы настроить её." if items else "Кнопок пока нет - создай первую."))
     return html, rows
 
 
@@ -71,7 +71,7 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
     app, db, t = ctx.app, ctx.app.db, now()
     k = item.id
     if item.kind == "url":
-        html = (f"🌐 <b>{escape(item.label)}</b>\nОбычная ссылка: {escape(item.url or '—')}\n"
+        html = (f"🌐 <b>{escape(item.label)}</b>\nОбычная ссылка: {escape(item.url or 'нет')}\n"
                 f"Статус: {'включена' if item.is_active else 'выключена'}")
         rows = label_rows("item", str(k), await _row(ctx, k))
         rows.append([b("🌐 Изменить ссылку", f"x:iurl:{k}"), b(f"↔️ Широкая: {yes_no(item.wide)}", f"x:iwide:{k}")])
@@ -88,9 +88,9 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
     if not item.is_active:
         status = "⏸ выключена, юзеры её не видят"
     elif item.chat_id is None:
-        status = "🔌 чат не привязан — нажми «🔗 Привязать чат»"
+        status = "🔌 чат не привязан - нажми 🔗 Привязать чат"
     elif not ready:
-        status = "⚠️ чат недоступен — нажми «🔄 Заменить чат»"
+        status = "⚠️ чат недоступен - нажми 🔄 Заменить чат"
     else:
         status = "✅ работает"
     pool = app.links.pool_counts.get(k, 0)
@@ -99,7 +99,7 @@ async def view_item(ctx: Ctx, item_id: str) -> ViewResult:
         f"🔗 <b>{escape(item.label)}</b>\n\n"
         f"Статус: {status}\n"
         f"Чат: {chat_title(ctx, item.chat_id)}\n"
-        f"Режим: {MODES[item.mode]} — {MODE_HELP[item.mode]}\n"
+        f"Режим: {MODES[item.mode]} - {MODE_HELP[item.mode]}\n"
         f"Срок жизни ссылки: {minutes_text(item.ttl_minutes)}\n"
         f"Спонсоры перед выдачей: {'нет' if item.skip_sponsors else 'да'}\n"
         + (f"Готовых ссылок в запасе: {pool} из {target}\n" if target and ready else "")
@@ -135,7 +135,7 @@ def _common_rows(item: Item) -> Rows:
 # ---------- создание ----------
 @action("inew", "links")
 async def act_item_new(ctx: Ctx):
-    return await ctx.ask("inew", "✏️ Название новой кнопки (можно с премиум-эмодзи — оно станет иконкой):", "a:items")
+    return await ctx.ask("inew", "✏️ Название новой кнопки (можно с премиум-эмодзи - оно станет иконкой):", "a:items")
 
 
 @on_input("inew", "links")
@@ -154,14 +154,14 @@ async def in_item_new(ctx: Ctx, message: Message):
 @action("iunew", "links")
 async def act_url_new(ctx: Ctx):
     return await ctx.ask("iunew", "🌐 Пришлите кнопку одной строкой:\n<code>Текст кнопки | https://ссылка</code>\n"
-                                  "Можно @username или t.me/… Премиум-эмодзи станет иконкой.", "a:items")
+                                  "Можно @username или t.me/... Премиум-эмодзи станет иконкой.", "a:items")
 
 
 @on_input("iunew", "links")
 async def in_url_new(ctx: Ctx, message: Message):
     buttons, errors = parse_contacts(message)
     if errors or len(buttons) != 1:
-        raise InputError(errors[0] if errors else "Нужна одна строка «Текст | ссылка».")
+        raise InputError(errors[0] if errors else "Нужна одна строка Текст | ссылка.")
     label, url, icon = buttons[0]
     item_id = await _create(ctx, "url", label, icon, url)
     await ctx.log("item.create", label)
@@ -180,7 +180,7 @@ async def _create(ctx: Ctx, kind: str, label: str, icon: str | None, url: str | 
 
 @action("iurl", "links")
 async def act_item_url(ctx: Ctx, item_id: str):
-    return await ctx.ask("iurl", "🌐 Пришлите новую ссылку (https://…, t.me/… или @username):", f"a:item:{item_id}",
+    return await ctx.ask("iurl", "🌐 Пришлите новую ссылку (https://..., t.me/... или @username):", f"a:item:{item_id}",
                          item_id)
 
 
@@ -236,7 +236,7 @@ async def act_item_ttl(ctx: Ctx, item_id: str, minutes: str):
 
 @action("ittlin", "links")
 async def act_item_ttl_input(ctx: Ctx, item_id: str):
-    return await ctx.ask("ittl", "Сколько минут живёт ссылка? Пришлите число (0 — без срока).", f"a:ittl:{item_id}",
+    return await ctx.ask("ittl", "Сколько минут живёт ссылка? Пришлите число (0 - без срока).", f"a:ittl:{item_id}",
                          item_id)
 
 
@@ -284,8 +284,8 @@ async def view_item_revoke(ctx: Ctx, item_id: str) -> ViewResult:
         ctx.notice = "Живых выданных ссылок нет."
         return await view_item(ctx, item_id)
     return (f"🗑 Отозвать <b>{n}</b> выданных неиспользованных ссылок?\n"
-            "Они сразу перестанут работать. Кто нажмёт кнопку снова — получит новую.\n\n"
-            "Telegram не даёт ботам стирать ссылки совсем: отозванные лежат в разделе «Отозванные» "
+            "Они сразу перестанут работать. Кто нажмёт кнопку снова - получит новую.\n\n"
+            "Telegram не даёт ботам стирать ссылки совсем: отозванные лежат в разделе Отозванные "
             "в настройках чата, их можно удалить оттуда одной кнопкой.",
             [[b("🗑 Отозвать", f"x:irev:{item_id}", "danger"), b("✖️ Отмена", f"a:item:{item_id}")]])
 
@@ -303,7 +303,7 @@ async def view_item_delete(ctx: Ctx, item_id: str) -> ViewResult:
     item = item_or_none(ctx, item_id)
     if item is None:
         return await view_items(ctx)
-    return (f"❌ Удалить кнопку «{escape(item.label)}»?\nВсе её неиспользованные ссылки будут отозваны.",
+    return (f"❌ Удалить кнопку {escape(item.label)}?\nВсе её неиспользованные ссылки будут отозваны.",
             [[b("🗑 Да, удалить", f"x:idel:{item_id}", "danger"), b("✖️ Отмена", f"a:item:{item_id}")]])
 
 
@@ -315,7 +315,7 @@ async def act_item_delete(ctx: Ctx, item_id: str):
         await ctx.app.db.execute("DELETE FROM items WHERE id = ?", (item.id,))
         await ctx.reload()
         await ctx.log("item.delete", item.label)
-        ctx.notice = f"🗑 Кнопка «{escape(item.label)}» удалена"
+        ctx.notice = f"🗑 Кнопка {escape(item.label)} удалена"
     return "a:items"
 
 
@@ -328,11 +328,11 @@ async def view_bind(ctx: Ctx, item_id: str) -> ViewResult:
     ctx.app.start_bind(ctx.user_id, "item", item.id)
     base = f"https://t.me/{ctx.app.bot_username}"
     html = (
-        f"🔗 <b>Чат для кнопки «{escape(item.label)}»</b>\n\n"
-        "Нажми «➕ Добавить в канал» или «➕ Добавить в группу» и выбери нужный чат — "
-        "право «Приглашать пользователей» там уже отмечено. Бот сам привяжется к этой кнопке "
+        f"🔗 <b>Чат для кнопки {escape(item.label)}</b>\n\n"
+        "Нажми ➕ Добавить в канал или ➕ Добавить в группу и выбери нужный чат - "
+        "право Приглашать пользователей там уже отмечено. Бот сам привяжется к этой кнопке "
         "и пришлёт подтверждение.\n\n"
-        "Жду 10 минут. Если бот уже админ в нужном чате — выбери его из подключённых."
+        "Жду 10 минут. Если бот уже админ в нужном чате - выбери его из подключённых."
     )
     if item.chat_id:
         html += f"\n\nСейчас: {chat_title(ctx, item.chat_id)}. После замены старые ссылки будут отозваны."
@@ -371,7 +371,7 @@ async def act_bind_to(ctx: Ctx, item_id: str, chat_id: str):
     ctx.app.pending_binds.pop(ctx.user_id, None)
     await ctx.app.links.bind(int(item_id), chat.id)
     await ctx.log("item.bind", f"{item_id}: {chat.title}")
-    ctx.notice = f"✅ Кнопка ведёт в «{escape(chat.title)}»"
+    ctx.notice = f"✅ Кнопка ведёт в {escape(chat.title)}"
     return f"a:item:{item_id}"
 
 
@@ -385,10 +385,10 @@ async def view_chats(ctx: Ctx) -> ViewResult:
         state = "✅ админ" if c.can_invite else ("⚠️ нет права приглашать" if c.is_present else "🚪 бота убрали")
         used = [i.label for i in store.items.values() if i.chat_id == c.id]
         used += [f"спонсор {s.title}" for s in store.sponsor_chats.get(c.id, []) if s.is_active]
-        lines.append(f"{'📢' if c.type == 'channel' else '👥'} <b>{escape(c.title)}</b> — {state}"
+        lines.append(f"{'📢' if c.type == 'channel' else '👥'} <b>{escape(c.title)}</b> - {state}"
                      + (f"\n   ↳ {escape(', '.join(used))}" if used else ""))
         if not c.is_present and not used:
-            rows.append([b(f"🧹 Забыть «{c.title[:30]}»", f"x:chforget:{c.id}")])
+            rows.append([b(f"🧹 Забыть {c.title[:30]}", f"x:chforget:{c.id}")])
     rows.append(back_btn("a:items"))
     html = "🔌 <b>Чаты бота</b>\n\n" + ("\n".join(lines) or "Бот пока ни в одном чате.")
     return html, rows

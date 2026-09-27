@@ -1,9 +1,9 @@
 """Движок админки.
 
-Экраны — функции `@view("name")`, открываются кнопкой `a:name:арг1:арг2`.
-Действия — `@action("name")`, кнопка `x:name:...`; возвращают callback экрана, куда вернуться.
-Ввод текста/медиа — `ctx.ask(...)` + обработчик `@on_input("name")`.
-Права проверяются здесь, в одном месте. Админка — тоже один экран: бот редактирует своё сообщение.
+Экраны - функции `@view("name")`, открываются кнопкой `a:name:арг1:арг2`.
+Действия - `@action("name")`, кнопка `x:name:...`; возвращают callback экрана, куда вернуться.
+Ввод текста/медиа - `ctx.ask(...)` + обработчик `@on_input("name")`.
+Права проверяются здесь, в одном месте. Админка - тоже один экран: бот редактирует своё сообщение.
 """
 import logging
 from dataclasses import dataclass, field
@@ -46,7 +46,7 @@ ViewResult = tuple[str, Rows]
 
 
 class InputError(Exception):
-    """Ошибка ввода — показывается админу, ввод повторяется."""
+    """Ошибка ввода - показывается админу, ввод повторяется."""
 
 
 class AdminInput(StatesGroup):
@@ -131,8 +131,8 @@ async def render(ctx: Ctx, result: ViewResult, message_id: int | None) -> None:
     html, rows = result
     if ctx.notice:
         html = f"{ctx.notice}\n\n{html}"
-    if len(html) > TEXT_LIMIT:  # резать HTML посередине тега нельзя — показываем простым текстом
-        html = escape(html_to_plain(html))[:TEXT_LIMIT - 1] + "…"
+    if len(html) > TEXT_LIMIT:  # резать HTML посередине тега нельзя - показываем простым текстом
+        html = escape(html_to_plain(html))[:TEXT_LIMIT - 1] + "..."
     kb = markup(rows)
     bot = ctx.app.bot
     if message_id:
@@ -246,7 +246,7 @@ async def on_admin_input(message: Message, state: FSMContext, app: App, perms: s
         await state.set_state(None)
     result = await open_view(ctx, next_cb) if isinstance(next_cb, str) else next_cb
     if data.get("keep"):
-        screen_id = None  # сообщение админа осталось в чате — экран присылаем ниже
+        screen_id = None  # сообщение админа осталось в чате - экран присылаем ниже
     await render(ctx, result, screen_id)
 
 
@@ -267,7 +267,7 @@ def snippet(html: str, limit: int = 300) -> str:
     plain = html_to_plain(html).strip()
     if not plain:
         return "<i>пусто</i>"
-    return escape(plain[:limit] + ("…" if len(plain) > limit else ""))
+    return escape(plain[:limit] + ("..." if len(plain) > limit else ""))
 
 
 def style_name(style: str | None) -> str:
@@ -288,7 +288,7 @@ def media_line(app: App, media_id: int | None) -> str:
 
 def fmt_date(ts: int | None, tz: int) -> str:
     from ...services.ads import fmt_date as _fmt
-    return _fmt(ts, tz) if ts else "—"
+    return _fmt(ts, tz) if ts else "нет"
 
 
 # ---------- универсальные редакторы ----------
@@ -325,12 +325,12 @@ async def fetch_target(ctx: Ctx, kind: str, key: str):
 
 LABEL_HELP = (
     "Отправьте новый текст кнопки.\n"
-    "Первое <b>премиум-эмодзи</b> в сообщении станет иконкой кнопки — бот сам возьмёт его ID.\n"
+    "Первое <b>премиум-эмодзи</b> в сообщении станет иконкой кнопки - бот сам возьмёт его ID.\n"
     "Можно прислать только премиум-эмодзи, чтобы поменять одну иконку."
 )
 HTML_HELP = (
     "Отправьте новый текст. Форматирование, ссылки и <b>премиум-эмодзи</b> сохранятся как есть.\n"
-    "Можно прислать фото, GIF или видео с подписью — обновятся и картинка, и текст."
+    "Можно прислать фото, GIF или видео с подписью - обновятся и картинка, и текст."
 )
 MEDIA_HELP = "Пришлите фото, GIF или видео (можно файлом): JPG, PNG, WEBP, GIF, MP4."
 
@@ -420,7 +420,7 @@ async def in_media(ctx: Ctx, message: Message, kind: str, key: str):
     row = await fetch_target(ctx, kind, key)
     html, plain = message_html(message)
     if len(plain or html_to_plain(row["html"])) > CAPTION_LIMIT:
-        raise InputError(f"Текст длиннее {CAPTION_LIMIT} символов — с картинкой Telegram его не покажет. "
+        raise InputError(f"Текст длиннее {CAPTION_LIMIT} символов - с картинкой Telegram его не покажет. "
                          "Сначала сократите текст.")
     fields: dict[str, Any] = {"media_id": await save_media(ctx, message)}
     if plain:
@@ -449,7 +449,7 @@ async def view_color(ctx: Ctx, kind: str, key: str) -> ViewResult:
     rows: Rows = [[button(("✅ " if row["style"] == st else "") + name, style=st,
                           cb=f"x:setsty:{kind}:{key}:{st or 'none'}")] for st, name in COLORS]
     rows.append(back_btn(TARGETS[kind][2].format(key)))
-    return "🎨 <b>Цвет кнопки</b>\nНажмите нужный — каждая кнопка ниже показана своим цветом.", rows
+    return "🎨 <b>Цвет кнопки</b>\nНажмите нужный - каждая кнопка ниже показана своим цветом.", rows
 
 
 @action("setsty")
@@ -525,7 +525,7 @@ async def view_home(ctx: Ctx) -> ViewResult:
         f"Реклама: <b>{len(store.active_ads)}</b> идёт · Спонсоры: <b>{len(app.sponsors.active())}</b>"
     )
     if broken:
-        html += "\n\n⚠️ Не работают кнопки: " + ", ".join(f"«{escape(i.label)}»" for i in broken[:5])
+        html += "\n\n⚠️ Не работают кнопки: " + ", ".join(f"{escape(i.label)}" for i in broken[:5])
     return html, rows
 
 

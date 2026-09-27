@@ -39,7 +39,7 @@ class FakeTelegram(BaseSession):
     documents: list[bytes] = field(default_factory=list)  # содержимое отправленных ботом файлов
     links_created: int = 0
     revoked: list[str] = field(default_factory=list)
-    members: set[tuple[int, int]] = field(default_factory=set)   # (chat_id, user_id) — кто где состоит
+    members: set[tuple[int, int]] = field(default_factory=set)   # (chat_id, user_id) - кто где состоит
     dead_chats: set[int] = field(default_factory=set)            # бот в этих чатах без прав
     flood_chats: set[int] = field(default_factory=set)           # тут Telegram просит подождать
     approved: list[tuple[int, int]] = field(default_factory=list)

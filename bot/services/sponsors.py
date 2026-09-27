@@ -1,7 +1,7 @@
 """Спонсоры (обязательная подписка).
 
-Бот — админ в канале спонсора и выдаёт свою ссылку: по ней точно видно, сколько людей пришло.
-Режим «по заявке»: поданная заявка засчитывается как подписка (удобно для закрытых каналов).
+Бот - админ в канале спонсора и выдаёт свою ссылку: по ней точно видно, сколько людей пришло.
+Режим по заявке: поданная заявка засчитывается как подписка (удобно для закрытых каналов).
 Проверка подписки кэшируется, чтобы не спрашивать Telegram на каждое нажатие.
 """
 import asyncio
@@ -64,7 +64,7 @@ class SponsorService:
             m = await self.app.bot.get_chat_member(sponsor.chat_id, user_id)
         except TelegramAPIError as e:
             await self._broken(sponsor, str(e))
-            return True  # спонсор сломан — юзеров не блокируем
+            return True  # спонсор сломан - юзеров не блокируем
         if m.status == ChatMemberStatus.RESTRICTED:
             return bool(getattr(m, "is_member", False))
         return m.status in IN_CHAT
@@ -74,8 +74,8 @@ class SponsorService:
             return
         self._warned.add(sponsor.id)
         await self.app.alert(
-            f"⚠️ Не могу проверить подписку на спонсора «{escape(sponsor.title)}»: {escape(reason)[:150]}.\n"
-            "Пока проверка пропускается. Проверь, что бот — админ в этом канале.", perm="sponsors")
+            f"⚠️ Не могу проверить подписку на спонсора {escape(sponsor.title)}: {escape(reason)[:150]}.\n"
+            "Пока проверка пропускается. Проверь, что бот - админ в этом канале.", perm="sponsors")
 
     # ---------- учёт ----------
     async def on_join(self, chat_id: int, link: str, user_id: int) -> bool:
@@ -114,7 +114,7 @@ class SponsorService:
         s = self.app.store.sponsors.get(sponsor_id)
         if s:
             await self.app.alert(
-                f"🏁 <b>Спонсор завершён</b>: «{escape(s.title)}» — {escape(reason)}.\n"
+                f"🏁 <b>Спонсор завершён</b>: {escape(s.title)} - {escape(reason)}.\n"
                 f"Подписались: <b>{s.joins}</b>, заявок: <b>{s.requests}</b>.", perm="sponsors")
 
     async def check_schedule(self) -> None:

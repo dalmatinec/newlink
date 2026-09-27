@@ -40,7 +40,7 @@ async def in_user_find(ctx: Ctx, message: Message):
     if origin is not None:
         sender = getattr(origin, "sender_user", None)
         if sender is None:
-            raise InputError("Пользователь скрыл пересылку в настройках — пришлите его ID.")
+            raise InputError("Пользователь скрыл пересылку в настройках - пришлите его ID.")
         uid = sender.id
     text = (message.text or "").strip()
     if uid is None and text.lstrip("-").isdigit():
@@ -59,7 +59,7 @@ async def view_user(ctx: Ctx, user_id: str) -> ViewResult:
     row = await app.db.fetchone("SELECT * FROM users WHERE id = ?", (uid,))
     tz = int(app.store.setting("tz_offset", 3))
     if row is None:
-        html = f"👤 <code>{uid}</code>\nВ базе нет — бот его ещё не видел."
+        html = f"👤 <code>{uid}</code>\nВ базе нет - бот его ещё не видел."
     else:
         ban = "нет"
         if row["is_banned"]:
@@ -234,7 +234,7 @@ async def view_broadcast(ctx: Ctx) -> ViewResult:
 
 @action("bcnew", "broadcast")
 async def act_broadcast_new(ctx: Ctx):
-    return await ctx.ask("bcnew", "Отправь сообщение для рассылки — люди получат его ровно в таком виде.", "a:bc",
+    return await ctx.ask("bcnew", "Отправь сообщение для рассылки - люди получат его ровно в таком виде.", "a:bc",
                          keep_message=True)
 
 
@@ -255,7 +255,7 @@ async def view_broadcast_confirm(ctx: Ctx) -> ViewResult:
         return await view_broadcast(ctx)
     count = len(await ctx.app.broadcaster.audience(draft["aud"]))
     html = (f"☝️ Сообщение выше получат <b>{count}</b> пользователей.\n"
-            f"Кнопок: <b>{len(draft['buttons'])}</b>\n\nПроверь «👁 Предпросмотром» и жми «✅ Отправить».")
+            f"Кнопок: <b>{len(draft['buttons'])}</b>\n\nПроверь 👁 Предпросмотром и жми ✅ Отправить.")
     rows: Rows = [
         [b(("• " if k == draft["aud"] else "") + name, f"x:bcaud:{k}") for k, (name, _) in AUDIENCES.items()],
         [b("🔘 Кнопки", "x:bcbtn"), b("👁 Предпросмотр", "x:bcprev")],
@@ -273,7 +273,7 @@ async def act_broadcast_audience(ctx: Ctx, key: str):
 
 @action("bcbtn", "broadcast")
 async def act_broadcast_buttons(ctx: Ctx):
-    return await ctx.ask("bcbtn", "🔘 Кнопки — каждая отдельной строкой:\n<code>Текст | https://ссылка</code>\n"
+    return await ctx.ask("bcbtn", "🔘 Кнопки - каждая отдельной строкой:\n<code>Текст | https://ссылка</code>\n"
                                   "Отправь <code>-</code>, чтобы убрать кнопки.", "a:bcc")
 
 
@@ -325,5 +325,5 @@ async def act_broadcast_go(ctx: Ctx):
 async def act_broadcast_stop(ctx: Ctx):
     if ctx.app.broadcaster.current is not None:
         ctx.app.broadcaster.current.cancelled = True
-    ctx.notice = "⛔️ Останавливаю…"
+    ctx.notice = "⛔️ Останавливаю..."
     return "a:bc"

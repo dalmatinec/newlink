@@ -1,9 +1,9 @@
-"""Пользовательская часть. Всё строится из кэша в памяти; база — только при выдаче ссылки.
+"""Пользовательская часть. Всё строится из кэша в памяти; база - только при выдаче ссылки.
 
 Callback-данные:
   m         главное меню
   i:<id>    нажали кнопку-ссылку
-  c:<id>    «Я подписался» на экране спонсоров
+  c:<id>    Я подписался на экране спонсоров
 """
 import math
 
@@ -84,7 +84,7 @@ async def open_item(app: App, user: User, chat_id: int, item: Item | None, curre
     async def fail(key: str) -> None:
         if call is not None:
             await answer(key)
-        else:  # пришли по прямой ссылке — показываем текст экраном
+        else:  # пришли по прямой ссылке - показываем текст экраном
             await show(app, user.id, chat_id, store.text(key).html, None,
                        markup([[sys_button(store, "back", cb="m")]]))
 

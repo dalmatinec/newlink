@@ -77,7 +77,7 @@ class AdService:
             eligible.append((n, a.views, a.id, a))
         if not eligible:
             return None
-        n, _, _, ad = min(eligible)  # меньше всего видел этот человек, потом — меньше всего показов вообще
+        n, _, _, ad = min(eligible)  # меньше всего видел этот человек, потом - меньше всего показов вообще
         return ad, n
 
     async def show(self, chat_id: int, user_id: int, placement: str) -> Message | None:
@@ -172,7 +172,7 @@ class AdService:
                 await self.finish(ad.id, "набран лимит показов")
 
     async def report(self, ad_id: int) -> str:
-        """Отчёт для рекламодателя — можно переслать как есть."""
+        """Отчёт для рекламодателя - можно переслать как есть."""
         await self.flush()
         db = self.app.db
         ad = await db.fetchone("SELECT * FROM ads WHERE id = ?", (ad_id,))
@@ -187,13 +187,13 @@ class AdService:
             f"Старт: {started}",
             f"Показов: <b>{ad['views']}</b>" + (f" из {ad['max_views']}" if ad["max_views"] else ""),
             f"Уникальных людей: <b>{ad['uniques']}</b>",
-            f"Где: {', '.join(PLACEMENTS[p] for p in ad['placements'].split(',') if p in PLACEMENTS) or '—'}",
+            f"Где: {', '.join(PLACEMENTS[p] for p in ad['placements'].split(',') if p in PLACEMENTS) or 'нигде'}",
         ]
         if ad["finished_at"]:
             lines.append(f"Завершена: {fmt_date(ad['finished_at'], tz)} ({escape(ad['finish_reason'] or '')})")
         if days:
             lines.append("\n<b>По дням</b> (показы / люди):")
-            lines += [f"{d['day'][8:10]}.{d['day'][5:7]} — {d['views']} / {d['uniques']}" for d in reversed(days)]
+            lines += [f"{d['day'][8:10]}.{d['day'][5:7]} - {d['views']} / {d['uniques']}" for d in reversed(days)]
         return "\n".join(lines)
 
 

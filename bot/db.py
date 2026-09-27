@@ -7,9 +7,9 @@ import aiosqlite
 
 log = logging.getLogger(__name__)
 
-# Каждая миграция применяется один раз, по порядку. Новые — только добавлять в конец.
+# Каждая миграция применяется один раз, по порядку. Новые - только добавлять в конец.
 MIGRATIONS: list[str] = [
-    # 1 — базовая схема
+    # 1 - базовая схема
     """
     CREATE TABLE settings (
         key   TEXT PRIMARY KEY,
@@ -56,7 +56,7 @@ MIGRATIONS: list[str] = [
         updated_at INTEGER NOT NULL
     );
 
-    -- кнопки главного меню: invite — личная ссылка в чат, url — обычная ссылка
+    -- кнопки главного меню: invite - личная ссылка в чат, url - обычная ссылка
     CREATE TABLE items (
         id            INTEGER PRIMARY KEY,
         kind          TEXT NOT NULL DEFAULT 'invite',
@@ -76,7 +76,7 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX ix_items_chat ON items(chat_id);
 
-    -- инвайт-ссылки. user_id IS NULL — ссылка лежит в пуле готовых и ждёт своего юзера
+    -- инвайт-ссылки. user_id IS NULL - ссылка лежит в пуле готовых и ждёт своего юзера
     CREATE TABLE invite_links (
         link        TEXT PRIMARY KEY,
         item_id     INTEGER NOT NULL,
@@ -151,8 +151,8 @@ MIGRATIONS: list[str] = [
         buttons       TEXT NOT NULL DEFAULT '[]',        -- JSON [[label, url, icon, style], ...]
         status        TEXT NOT NULL DEFAULT 'draft',     -- draft | active | paused | finished
         placements    TEXT NOT NULL DEFAULT 'start,link',
-        max_views     INTEGER NOT NULL DEFAULT 0,        -- 0 — без лимита
-        freq_hours    INTEGER NOT NULL DEFAULT 0,        -- 0 — каждый раз, -1 — один раз на человека
+        max_views     INTEGER NOT NULL DEFAULT 0,        -- 0 - без лимита
+        freq_hours    INTEGER NOT NULL DEFAULT 0,        -- 0 - каждый раз, -1 - один раз на человека
         ends_at       INTEGER,
         views         INTEGER NOT NULL DEFAULT 0,
         uniques       INTEGER NOT NULL DEFAULT 0,
@@ -185,7 +185,7 @@ MIGRATIONS: list[str] = [
         title         TEXT NOT NULL DEFAULT '',
         url           TEXT NOT NULL DEFAULT '',
         link_mode     TEXT NOT NULL DEFAULT 'plain',     -- plain | request (заявка = подписка)
-        target        INTEGER NOT NULL DEFAULT 0,        -- 0 — без лимита
+        target        INTEGER NOT NULL DEFAULT 0,        -- 0 - без лимита
         joins         INTEGER NOT NULL DEFAULT 0,
         requests      INTEGER NOT NULL DEFAULT 0,
         ends_at       INTEGER,
@@ -267,7 +267,7 @@ class Database:
         return cur.lastrowid or 0
 
     async def returning(self, sql: str, params: Iterable[Any] = ()) -> Any:
-        """INSERT/UPDATE … RETURNING x: первое значение первой строки, с коммитом."""
+        """INSERT/UPDATE ... RETURNING x: первое значение первой строки, с коммитом."""
         async with self.conn.execute(sql, tuple(params)) as cur:
             row = await cur.fetchone()
         await self.conn.commit()

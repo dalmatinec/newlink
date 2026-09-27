@@ -1,4 +1,4 @@
-"""Админка: реклама. Создание в два шага: переслал пост → «▶️ Запустить». Остальное — по желанию."""
+"""Админка: реклама. Создание в два шага: переслал пост → ▶️ Запустить. Остальное - по желанию."""
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -43,7 +43,7 @@ async def view_ads(ctx: Ctx) -> ViewResult:
     rows.append([b(f"⚙️ Общие настройки: {'вкл' if s('ads_enabled', 1) else '🔴 выкл'}", "a:adset")])
     rows.append(back_btn("a:home"))
     html = ("📢 <b>Реклама</b>\n\n"
-            "Создать: «➕ Новая реклама» → перешли или отправь пост → «▶️ Запустить». "
+            "Создать: ➕ Новая реклама → перешли или отправь пост → ▶️ Запустить. "
             "Кнопки из пересланного поста подтянутся сами.\n\n"
             f"Идёт сейчас: <b>{sum(r['status'] == 'active' for r in rows_db)}</b>")
     return html, rows
@@ -118,8 +118,8 @@ async def in_ad_post(ctx: Ctx, message: Message, ad_id: str):
             (title, html, media_id, json.dumps(buttons, ensure_ascii=False), now()))
         await ctx.reload()
         await ctx.log("ad.create", title)
-        ctx.notice = ("✅ Реклама создана. Проверь её «👁 Предпросмотром», при желании настрой лимит и срок, "
-                      "и жми «▶️ Запустить».")
+        ctx.notice = ("✅ Реклама создана. Проверь её 👁 Предпросмотром, при желании настрой лимит и срок, "
+                      "и жми ▶️ Запустить.")
         return f"a:ad:{new_id}"
     fields = {"html": html, "media_id": media_id}
     if buttons:
@@ -146,9 +146,9 @@ async def view_ad(ctx: Ctx, ad_id: str) -> ViewResult:
         pct = min(100, ad["views"] * 100 // ad["max_views"])
         progress = f" ({pct}%)"
     html = (
-        f"📢 <b>{escape(ad['title'])}</b> — {STATUS[ad['status']]}\n\n"
+        f"📢 <b>{escape(ad['title'])}</b> - {STATUS[ad['status']]}\n\n"
         f"👁 Показов: <b>{ad['views']}</b> из {limit_text(ad['max_views'])}{progress} · людей: <b>{ad['uniques']}</b>\n"
-        f"📍 Где: {', '.join(PLACEMENTS[p] for p in PLACEMENTS if p in places) or '⚠️ нигде — отметь ниже'}\n"
+        f"📍 Где: {', '.join(PLACEMENTS[p] for p in PLACEMENTS if p in places) or '⚠️ нигде - отметь ниже'}\n"
         f"📅 До: {fmt_date(ad['ends_at'], tz) if ad['ends_at'] else 'без срока'}\n"
         f"🔁 Одному человеку: {freq_text(ad['freq_hours'])}\n"
         f"🔘 Кнопок: {len(buttons)}\n\n"
@@ -191,15 +191,15 @@ async def act_ad_run(ctx: Ctx, ad_id: str, what: str):
         await ctx.toast("Сначала отметь, где показывать рекламу.", alert=True)
         return f"a:ad:{ad_id}"
     if ad["max_views"] and ad["views"] >= ad["max_views"]:
-        await ctx.toast("Лимит показов уже набран — увеличь лимит или сделай копию.", alert=True)
+        await ctx.toast("Лимит показов уже набран - увеличь лимит или сделай копию.", alert=True)
         return f"a:ad:{ad_id}"
     if ad["ends_at"] and ad["ends_at"] <= now():
-        await ctx.toast("Срок уже прошёл — поменяй срок.", alert=True)
+        await ctx.toast("Срок уже прошёл - поменяй срок.", alert=True)
         return f"a:ad:{ad_id}"
     await ctx.app.ads.start(ad["id"])
     await ctx.log("ad.start", ad["title"])
     if not ctx.app.store.setting("ads_enabled", 1):
-        ctx.notice = "▶️ Запущена, но реклама выключена в общих настройках — включи её там."
+        ctx.notice = "▶️ Запущена, но реклама выключена в общих настройках - включи её там."
     else:
         ctx.notice = "▶️ Реклама запущена"
     return f"a:ad:{ad_id}"
@@ -238,7 +238,7 @@ async def view_ad_limit(ctx: Ctx, ad_id: str) -> ViewResult:
     rows = _presets(LIMITS, ad["max_views"], f"x:adset1:{ad_id}:max_views", limit_text)
     rows.append([b("✍️ Своё число", f"x:adin:{ad_id}:max_views")])
     rows.append(back_btn(f"a:ad:{ad_id}"))
-    return "👁 <b>Лимит показов</b>\nКогда наберётся — реклама остановится сама и пришлёт отчёт.", rows
+    return "👁 <b>Лимит показов</b>\nКогда наберётся - реклама остановится сама и пришлёт отчёт.", rows
 
 
 @view("adfreq", "ads")
@@ -247,7 +247,7 @@ async def view_ad_freq(ctx: Ctx, ad_id: str) -> ViewResult:
     rows = _presets(FREQS, ad["freq_hours"], f"x:adset1:{ad_id}:freq_hours", freq_text)
     rows.append(back_btn(f"a:ad:{ad_id}"))
     return ("🔁 <b>Как часто показывать одному человеку</b>\n"
-            "«Один раз» — каждый увидит рекламу только однажды: максимум охвата разных людей."), rows
+            "Один раз - каждый увидит рекламу только однажды: максимум охвата разных людей."), rows
 
 
 @view("adend", "ads")
@@ -281,7 +281,7 @@ async def act_ad_end(ctx: Ctx, ad_id: str, days: str):
 @action("adin", "ads")
 async def act_ad_input(ctx: Ctx, ad_id: str, field: str):
     prompt = {
-        "max_views": "Сколько показов? Пришли число (0 — без лимита).",
+        "max_views": "Сколько показов? Пришли число (0 - без лимита).",
         "ends_at": "До какой даты показывать? Пришли дату <code>31.12</code> или <code>31.12.2026 18:00</code>, "
                    "либо число дней от сегодня.",
     }[field]
@@ -329,7 +329,7 @@ def parse_when(text: str, tz: int) -> int | None:
 async def act_ad_buttons(ctx: Ctx, ad_id: str):
     return await ctx.ask(
         "adbtn",
-        "🔘 <b>Кнопки рекламы</b>\nКаждая кнопка — отдельной строкой:\n"
+        "🔘 <b>Кнопки рекламы</b>\nКаждая кнопка - отдельной строкой:\n"
         "<code>Перейти в канал | https://t.me/channel</code>\n<code>Сайт | https://site.com</code>\n\n"
         "Премиум-эмодзи в строке станет иконкой кнопки. Отправь <code>-</code>, чтобы убрать все кнопки.",
         f"a:ad:{ad_id}", ad_id)
@@ -375,7 +375,7 @@ async def act_ad_copy(ctx: Ctx, ad_id: str):
         "SELECT title || ' (копия)', html, media_id, buttons, placements, max_views, freq_hours, ? FROM ads WHERE id = ?",
         (now(), int(ad_id)))
     await ctx.reload()
-    ctx.notice = "📑 Копия создана с нулевыми счётчиками — настрой и запускай."
+    ctx.notice = "📑 Копия создана с нулевыми счётчиками - настрой и запускай."
     return f"a:ad:{new_id}"
 
 
@@ -388,7 +388,7 @@ async def view_ad_report(ctx: Ctx, ad_id: str) -> ViewResult:
 @action("adrepsend", "ads")
 async def act_ad_report_send(ctx: Ctx, ad_id: str):
     await ctx.app.bot.send_message(ctx.chat_id, await ctx.app.ads.report(int(ad_id)))
-    await ctx.toast("👇 Отчёт ниже — его можно переслать рекламодателю")
+    await ctx.toast("👇 Отчёт ниже - его можно переслать рекламодателю")
     return None
 
 

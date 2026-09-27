@@ -29,7 +29,7 @@ log = logging.getLogger("bot")
 
 
 async def setup(config: Config, bot: Bot) -> tuple[App, Dispatcher, GuardMiddleware]:
-    """Собирает приложение: база, кэш, сервисы, диспетчер. Отдельно от main — для тестов."""
+    """Собирает приложение: база, кэш, сервисы, диспетчер. Отдельно от main - для тестов."""
     db = Database(config.db_path)
     await db.connect()
     await apply_seed(db)
@@ -60,7 +60,7 @@ async def setup(config: Config, bot: Bot) -> tuple[App, Dispatcher, GuardMiddlew
     dp.message.outer_middleware(guard)
     dp.callback_query.outer_middleware(guard)
     dp.include_router(chats_router)
-    dp.include_router(admin_router)  # раньше пользовательского: ввод админа важнее «чистки чата»
+    dp.include_router(admin_router)  # раньше пользовательского: ввод админа важнее чистки чата
     dp.include_router(user_router)
 
     @dp.errors()
