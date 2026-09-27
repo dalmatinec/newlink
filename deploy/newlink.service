@@ -1,0 +1,29 @@
+# Сервис systemd для бота. Установка: bash /opt/newlink/deploy/install.sh
+[Unit]
+Description=newlink invite links bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=newlink
+Group=newlink
+WorkingDirectory=/opt/newlink
+ExecStart=/opt/newlink/.venv/bin/python -m bot
+Restart=always
+RestartSec=5
+# при остановке бот сам сохраняет буферы и закрывает базу
+KillSignal=SIGTERM
+TimeoutStopSec=20
+Environment=PYTHONUNBUFFERED=1
+
+# бот пишет только в свою папку data
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/newlink/data
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,55 +1,122 @@
+"""Точка входа: python -m bot"""
 import asyncio
 import logging
-from typing import Any, Awaitable, Callable
 
-from aiogram import BaseMiddleware, Bot, Dispatcher
+from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ChatType, ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand, TelegramObject
+from aiogram.types import BotCommand, ErrorEvent
 
-from bot.config import load_config
-from bot.db import Database
-from bot.handlers import admin, chat_events, user
-from bot.services.invites import cleanup_loop
+from .app import App
+from .config import Config, load_config
+from .db import Database
+from .handlers.admin import router as admin_router
+from .handlers.chats import router as chats_router
+from .handlers.user import router as user_router
+from .jobs import run_jobs
+from .media import MediaStore
+from .middlewares import GuardMiddleware
+from .seed import apply_seed
+from .services.ads import AdService
+from .services.broadcast import Broadcaster
+from .services.links import LinkService
+from .services.sponsors import SponsorService
+from .store import Store
+from .telelog import TelegramLogHandler
+
+log = logging.getLogger("bot")
 
 
-class TrackUsers(BaseMiddleware):
-    """Запоминает каждого, кто пишет боту в личку или жмёт кнопки."""
+async def setup(config: Config, bot: Bot) -> tuple[App, Dispatcher, GuardMiddleware]:
+    """Собирает приложение: база, кэш, сервисы, диспетчер. Отдельно от main — для тестов."""
+    db = Database(config.db_path)
+    await db.connect()
+    await apply_seed(db)
+    store = Store(db)
+    await store.reload()
 
-    async def __call__(
-        self,
-        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
-        data: dict[str, Any],
-    ) -> Any:
-        u = data.get("event_from_user")
-        chat = data.get("event_chat")
-        if u and not u.is_bot and (chat is None or chat.type == ChatType.PRIVATE):
-            await data["db"].touch_user(u.id, u.first_name, u.username)
-        return await handler(event, data)
+    me = await bot.get_me()
+    media = MediaStore(db, config.media_dir)
+    await media.load(me.id)
+    app = App(config, db, store, media, bot, bot_username=me.username or "")
+    app.links = LinkService(app)
+    app.ads = AdService(app)
+    app.sponsors = SponsorService(app)
+    app.broadcaster = Broadcaster(app)
+    await app.load_users()
+
+    async def on_missing(media_id: int) -> None:
+        await app.notify_admins(f"⚠️ Картинка #{media_id} не найдена на диске, экран показан без неё. "
+                                "Загрузите её заново.", perm="texts")
+    media.on_missing = on_missing
+
+    if store.setting("last_bot_id", 0) != me.id:
+        log.info("Запущен бот @%s (id %s): медиа будут перезалиты", me.username, me.id)
+        await app.set_setting("last_bot_id", me.id)
+
+    dp = Dispatcher(storage=MemoryStorage(), app=app)
+    guard = GuardMiddleware(app)
+    dp.message.outer_middleware(guard)
+    dp.callback_query.outer_middleware(guard)
+    dp.include_router(chats_router)
+    dp.include_router(admin_router)  # раньше пользовательского: ввод админа важнее «чистки чата»
+    dp.include_router(user_router)
+
+    @dp.errors()
+    async def on_error(event: ErrorEvent) -> bool:
+        if isinstance(event.exception, TelegramBadRequest) and "query is too old" in event.exception.message:
+            return True
+        log.exception("Необработанная ошибка", exc_info=event.exception)
+        return True
+
+    return app, dp, guard
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     config = load_config()
-    db = await Database.connect(config.db_path)
-    bot = Bot(
-        config.token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML, link_preview_is_disabled=True),
-    )
-    dp = Dispatcher(storage=MemoryStorage(), db=db, config=config)
-    dp.message.outer_middleware(TrackUsers())
-    dp.callback_query.outer_middleware(TrackUsers())
-    dp.include_routers(chat_events.router, admin.router, user.router)
+    logging.basicConfig(level=config.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    try:
+        import uvloop  # быстрее стандартного цикла, если установлен
+        uvloop.install()
+    except ImportError:
+        pass
+    bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode="HTML", link_preview_is_disabled=True))
+    app, dp, guard = await setup(config, bot)
+    media = app.media
 
     await bot.set_my_commands([BotCommand(command="start", description="Главное меню")])
-    cleanup = asyncio.create_task(cleanup_loop(bot, db))
+
+    tasks = [
+        asyncio.create_task(run_jobs(app, guard)),
+        asyncio.create_task(app.links.refill_loop()),
+        asyncio.create_task(app.links.revoke_worker()),
+    ]
+    app.links.wake.set()
+    if media.pending_warmup():
+        owner = min(config.owner_ids)
+
+        async def warmup() -> None:
+            ok, failed = await media.warmup(bot, owner)
+            log.info("Прогрев медиа: загружено %s, ошибок %s", ok, failed)
+        tasks.append(asyncio.create_task(warmup()))
+
+    tg_log = TelegramLogHandler(app)
+    logging.getLogger().addHandler(tg_log)
+    tasks.append(asyncio.create_task(tg_log.run()))
+
+    log.info("Бот @%s запущен", app.bot_username)
+    await app.log_event(f"🟢 Бот @{app.bot_username} запущен. Кнопок: {len(app.store.menu)}, "
+                        f"пользователей: {len(app.known_users)}.")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        cleanup.cancel()
-        await db.close()
+        await app.log_event(f"🔴 Бот @{app.bot_username} остановлен.")
+        logging.getLogger().removeHandler(tg_log)
+        for t in tasks:
+            t.cancel()
+        await app.flush()
+        await app.db.close()
         await bot.session.close()
 
 
