@@ -52,6 +52,7 @@ class App:
     banned: dict[int, int | None] = field(default_factory=dict)  # user_id -> until (None = навсегда)
     screens: dict[int, Screen] = field(default_factory=dict)
     pending_binds: dict[int, PendingBind] = field(default_factory=dict)
+    link_msgs: dict[tuple[int, int], tuple[int, str]] = field(default_factory=dict)  # (юзер, кнопка) -> (сообщение, ссылка)
     _seen: dict[int, tuple[int, str | None, str | None]] = field(default_factory=dict)
     _screen_ids: dict[int, int] = field(default_factory=dict)
 
@@ -114,6 +115,11 @@ class App:
         if user_id in self.screens:
             return self.screens[user_id].message_id
         return await self.db.fetchval("SELECT screen_msg_id FROM users WHERE id = ?", (user_id,))
+
+    def remember_link_msg(self, key: tuple[int, int], message_id: int, link: str) -> None:
+        if len(self.link_msgs) > 300_000:  # память под контролем
+            self.link_msgs.clear()
+        self.link_msgs[key] = (message_id, link)
 
     # ---------- привязка чатов ----------
     def start_bind(self, admin_id: int, kind: str, ref: int = 0) -> None:

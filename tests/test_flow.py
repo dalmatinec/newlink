@@ -80,6 +80,14 @@ class Harness:
     def screen(self, uid: int) -> ChatMessage:
         return self.tg.messages[(uid, self.screen_id(uid))]
 
+    def link_msgs(self, uid: int) -> list[ChatMessage]:
+        """Сообщения со ссылками (кнопка Вступить ведёт на t.me/+...)."""
+        return [m for m in self.tg.chat(uid) if m.markup is not None and m.markup.inline_keyboard
+                and (m.markup.inline_keyboard[0][0].url or "").startswith("https://t.me/+")]
+
+    def link_msg(self, uid: int) -> ChatMessage:
+        return self.link_msgs(uid)[-1]
+
     def user_screen(self, uid: int) -> ChatMessage:
         return self.tg.messages[(uid, self.app.screens[uid].message_id)]
 
@@ -166,14 +174,21 @@ class LinkFlow(Base):
         self.assertEqual(home.markup.inline_keyboard[0][0].callback_data, f"i:{item_id}")
 
         await h.click(USER, f"i:{item_id}")
-        screen = h.user_screen(USER)
-        link = join_url(screen)
-        self.assertIn("одноразовая", screen.text)
+        msg = h.link_msg(USER)
+        link = join_url(msg)
+        self.assertIn("одноразовая", msg.text)
+        self.assertEqual(msg.markup.inline_keyboard[1][0].callback_data, f"cl:{item_id}")
         self.assertEqual(tg.links_created, created, "ссылка должна прийти из запаса, без запроса к Telegram")
+        self.assertIn("Привет, U42", h.user_screen(USER).text, "главное меню осталось на месте")
 
-        await h.click(USER, "m")
         await h.click(USER, f"i:{item_id}")
-        self.assertEqual(join_url(h.user_screen(USER)), link, "повторное нажатие отдаёт ту же ссылку")
+        self.assertEqual(len(h.link_msgs(USER)), 1, "повторное нажатие не шлёт вторую ссылку")
+
+        await h.click(USER, f"cl:{item_id}", msg.id)  # закрыли сообщение
+        self.assertEqual(h.link_msgs(USER), [])
+        self.assertIn("Привет, U42", h.user_screen(USER).text)
+        await h.click(USER, f"i:{item_id}")
+        self.assertEqual(join_url(h.link_msg(USER)), link, "после закрытия приходит та же живая ссылка")
 
         await h.joined(CHAN, USER, link)
         self.assertEqual(await app.db.fetchval("SELECT COUNT(*) FROM joins WHERE item_id = ?", (item_id,)), 1)
@@ -186,7 +201,8 @@ class LinkFlow(Base):
         await app.set_setting("pool_size", 0)
         item_id = await h.make_item()
         await h.send(USER, f"/start i{item_id}")
-        self.assertTrue(join_url(h.user_screen(USER)).startswith("https://t.me/+"))
+        self.assertTrue(join_url(h.link_msg(USER)).startswith("https://t.me/+"))
+        self.assertIn("Привет", h.user_screen(USER).text, "по прямой ссылке тоже есть главное меню")
         self.assertEqual(tg.links_created, 1)
 
     async def test_request_mode_admins_decide(self):
@@ -196,7 +212,7 @@ class LinkFlow(Base):
         self.assertEqual(app.store.items[item_id].mode, "request")
         await h.send(USER, "/start")
         await h.click(USER, f"i:{item_id}")
-        screen = h.user_screen(USER)
+        screen = h.link_msg(USER)
         self.assertIn("рассмотрят админы", screen.text)
         link = join_url(screen)
         await h.join_request(CHAN, USER, link)
@@ -214,13 +230,14 @@ class LinkFlow(Base):
         await h.admin(f"x:ittl:{item_id}:15")
         await h.send(USER, "/start")
         await h.click(USER, f"i:{item_id}")
-        self.assertIn("действует ещё 15 мин", h.user_screen(USER).text)
-        link = join_url(h.user_screen(USER))
+        self.assertIn("действует ещё 15 мин", h.link_msg(USER).text)
+        link = join_url(h.link_msg(USER))
         await app.db.execute("UPDATE invite_links SET expires_at = ? WHERE link = ?", (now() - 1, link))
         await app.links.cleanup()
         self.assertEqual(await app.db.fetchval("SELECT revoked FROM invite_links WHERE link = ?", (link,)), 1)
         await h.click(USER, f"i:{item_id}")
-        self.assertNotEqual(join_url(h.user_screen(USER)), link, "после отзыва выдаётся новая ссылка")
+        self.assertNotEqual(join_url(h.link_msg(USER)), link, "после отзыва выдаётся новая ссылка")
+        self.assertEqual(len(h.link_msgs(USER)), 1, "сообщение с мёртвой ссылкой убрано")
 
     async def test_broken_chat_and_rebind(self):
         h, app, tg = self.h, self.app, self.tg
@@ -239,7 +256,7 @@ class LinkFlow(Base):
         self.assertFalse(item.broken)
         await h.send(USER, "/start")
         await h.click(USER, f"i:{item_id}")
-        self.assertIn(f"L{CHAN2}", join_url(h.user_screen(USER)))
+        self.assertIn(f"L{CHAN2}", join_url(h.link_msg(USER)))
 
     async def test_bot_kicked_marks_broken(self):
         h, app, tg = self.h, self.app, self.tg
