@@ -21,6 +21,7 @@ from .seed import apply_seed
 from .services.ads import AdService
 from .services.broadcast import Broadcaster
 from .services.links import LinkService
+from .services.updates import UpdateNotifier
 from .store import Store
 from .telelog import TelegramLogHandler
 
@@ -42,6 +43,7 @@ async def setup(config: Config, bot: Bot) -> tuple[App, Dispatcher, GuardMiddlew
     app.links = LinkService(app)
     app.ads = AdService(app)
     app.broadcaster = Broadcaster(app)
+    app.updates = UpdateNotifier(app)
     await app.load_users()
 
     async def on_missing(media_id: int) -> None:

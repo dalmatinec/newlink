@@ -3,6 +3,7 @@
     "pool_size": 5,
     "cleanup_hours": 24,
     "auto_approve": 0,
+    "notify_link_change": 1,
     "ads_enabled": 1,
     "ad_gap_minutes": 10,
     "clean_chat": 1,
@@ -27,7 +28,8 @@
     "busy": "Сейчас очень много желающих, попробуй через минуту 🙏",
     "banned": "🚫 Доступ ограничен.",
     "flood": "🐢 Не так быстро!",
-    "link_sent": "👇 Ссылка уже в чате, листай ниже"
+    "link_sent": "👇 Ссылка уже в чате, листай ниже",
+    "links_updated": "🔄 Наши ссылки на {кнопки} обновлены.\nНажмите /start, чтобы получить новые."
   },
   "buttons": {
     "join": {"label": "🚀 Вступить", "style": "success"},

@@ -214,6 +214,8 @@ class LinkService:
         await self.app.reload()
         if old_chat and old_chat != chat_id:
             await self.forget_if_dead(old_chat)
+            if item is not None and item.is_active:
+                self.app.updates.changed(item_id, item.label)
         self.wake.set()
 
     async def forget_if_dead(self, chat_id: int) -> None:
