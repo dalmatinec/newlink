@@ -5,6 +5,7 @@ from aiogram.types import Message
 
 from ...layout import grid_of, move, rows_of
 from ...richtext import normalize_url, parse_contacts, parse_label
+from ...services.updates import safe_edit
 from ...store import Item, now
 from ...ui import button, minutes_text
 from .core import (
@@ -461,3 +462,23 @@ async def act_chats_check(ctx: Ctx):
     ctx.notice = "✅ Проверка закончена"
     return "a:chats"
 
+
+
+# ---------- уведомление юзеров об обновлении ссылок ----------
+@action("updnow", "links")
+async def act_updates_now(ctx: Ctx):
+    call = ctx.extra["call"]
+    n = await ctx.app.updates.send_now(ctx.user_id)
+    text = f"📣 Уведомление отправляется {n} пользователям." if n else "Нечего отправлять: уже ушло или отменено."
+    await ctx.toast(text)
+    await safe_edit(ctx.app, ctx.chat_id, call.message.message_id, text)
+    return None
+
+
+@action("updno", "links")
+async def act_updates_cancel(ctx: Ctx):
+    call = ctx.extra["call"]
+    text = "✖️ Уведомление не отправлено." if ctx.app.updates.cancel() else "Уже отправлено или отменено."
+    await ctx.toast(text)
+    await safe_edit(ctx.app, ctx.chat_id, call.message.message_id, text)
+    return None

@@ -354,7 +354,7 @@ class Admin(Base):
         from bot.handlers.admin.content import GROUPS, TEXTS
         from bot.handlers.admin.system import SETTING_GROUPS
         screens += [f"a:text:{k}" for k in TEXTS] + [f"a:txg:{g}" for g in GROUPS]
-        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:chats", "a:lay", f"a:lay:{item_id}", f"a:imore:{item_id}", f"a:admore:{ad_id}"]
+        screens += [f"a:setg:{g}" for g in SETTING_GROUPS] + ["a:chats", "a:text:links_updated", "a:lay", f"a:lay:{item_id}", f"a:imore:{item_id}", f"a:admore:{ad_id}"]
         for cb in screens:
             m = await h.admin(cb)
             self.assertNotIn("Ошибка", m.text or "", cb)
@@ -438,6 +438,71 @@ class Admin(Base):
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         self.assertTrue(app.is_banned(USER))
+
+
+class LinkUpdates(Base):
+    async def _warn(self) -> ChatMessage:
+        for _ in range(3):
+            await asyncio.sleep(0)
+        return next(m for m in reversed(self.tg.chat(OWNER)) if "Через минуту" in (m.text or ""))
+
+    async def test_replace_chat_notifies_everyone(self):
+        h, app, tg = self.h, self.app, self.tg
+        item_id = await h.make_item()
+        await h.send(USER, "/start")
+        await h.send(OTHER, "/start")
+        self.assertEqual(app.updates.pending, {}, "первая привязка не считается обновлением")
+        await h.bot_status(CHAN2, title="Новый")
+        await h.admin(f"x:bindto:{item_id}:{CHAN2}")
+        warn = await self._warn()
+        self.assertIn("VIP", warn.text)
+        await h.click(OWNER, "x:updnow", warn.id)
+        await app.broadcaster.task
+        for uid in (USER, OTHER):
+            last = tg.last(uid).text
+            self.assertIn("Наши ссылки на 🔥 VIP обновлены", last)
+            self.assertIn("/start", last)
+        self.assertEqual(app.updates.pending, {})
+
+    async def test_several_buttons_one_message_and_cancel(self):
+        h, app, tg = self.h, self.app, self.tg
+        a = await h.make_item("🔥 VIP")
+        b = await h.make_item("💰 PRICE", chat_id=CHAN2)
+        await h.send(USER, "/start")
+        await h.bot_status(-1005, title="Новый 1")
+        await h.bot_status(-1006, title="Новый 2")
+        await h.admin(f"x:bindto:{a}:-1005")
+        await h.admin(f"x:bindto:{b}:-1006")
+        self.assertEqual(sorted(app.updates.pending), sorted([a, b]))
+        before = len(tg.chat(USER))
+        await app.updates.send_now(OWNER)
+        await app.broadcaster.task
+        self.assertEqual(len(tg.chat(USER)), before + 1, "одно сообщение на все замены")
+        self.assertIn("🔥 VIP, 💰 PRICE", tg.last(USER).text)
+
+        await h.bot_status(-1007, title="Новый 3")
+        await h.admin(f"x:bindto:{a}:-1007")
+        warn = await self._warn()
+        await h.click(OWNER, "x:updno", warn.id)
+        self.assertEqual(app.updates.pending, {})
+        self.assertIn("не отправлено", tg.messages[(OWNER, warn.id)].text)
+
+    async def test_switch_off_and_auto_send(self):
+        h, app, tg = self.h, self.app, self.tg
+        item_id = await h.make_item()
+        await h.send(USER, "/start")
+        await h.admin("x:settog:notify_link_change:g_links")
+        await h.bot_status(CHAN2, title="Новый")
+        await h.admin(f"x:bindto:{item_id}:{CHAN2}")
+        self.assertEqual(app.updates.pending, {}, "выключено в настройках")
+
+        await h.admin("x:settog:notify_link_change:g_links")
+        app.updates.delay = 0.01
+        await h.bot_status(-1005, title="Ещё новый")
+        await h.admin(f"x:bindto:{item_id}:-1005")
+        await asyncio.sleep(0.1)
+        await app.broadcaster.task
+        self.assertIn("обновлены", tg.last(USER).text, "ушло само через паузу")
 
 
 class ChatHealth(Base):

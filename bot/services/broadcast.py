@@ -57,18 +57,29 @@ class Broadcaster:
 
     def start(self, admin_id: int, from_chat: int, message_id: int, ids: list[int],
               kb: InlineKeyboardMarkup | None) -> None:
-        self.current = Broadcast(admin_id, len(ids))
-        self.task = asyncio.create_task(self._run(self.current, from_chat, message_id, ids, kb))
+        """Рассылка копией сообщения админа."""
+        async def send(uid: int) -> None:
+            await self.app.bot.copy_message(uid, from_chat, message_id, reply_markup=kb)
+        self._launch(admin_id, ids, send, "Рассылка")
 
-    async def _run(self, b: Broadcast, from_chat: int, message_id: int, ids: list[int],
-                   kb: InlineKeyboardMarkup | None) -> None:
+    def start_text(self, admin_id: int, html: str, ids: list[int], title: str = "Рассылка") -> None:
+        """Рассылка готового текста (например, уведомление об обновлении ссылок)."""
+        async def send(uid: int) -> None:
+            await self.app.bot.send_message(uid, html)
+        self._launch(admin_id, ids, send, title)
+
+    def _launch(self, admin_id: int, ids: list[int], send, title: str) -> None:
+        self.current = Broadcast(admin_id, len(ids))
+        self.task = asyncio.create_task(self._run(self.current, ids, send, title))
+
+    async def _run(self, b: Broadcast, ids: list[int], send, title: str) -> None:
         bot = self.app.bot
         for uid in ids:
             if b.cancelled:
                 break
             while True:
                 try:
-                    await bot.copy_message(uid, from_chat, message_id, reply_markup=kb)
+                    await send(uid)
                     b.sent += 1
                 except TelegramRetryAfter as e:
                     await asyncio.sleep(e.retry_after + 1)
@@ -81,7 +92,7 @@ class Broadcaster:
                 break
             await asyncio.sleep(0.05)
         b.finished = now()
-        report = ("📣 <b>Рассылка остановлена</b>\n" if b.cancelled else "📣 <b>Рассылка завершена</b>\n") + b.summary()
+        report = f"📣 <b>{title} {'остановлена' if b.cancelled else 'завершена'}</b>\n" + b.summary()
         try:
             await bot.send_message(b.admin_id, report)
         except TelegramAPIError:

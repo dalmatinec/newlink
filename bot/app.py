@@ -15,6 +15,7 @@ from .store import Store, now
 if TYPE_CHECKING:
     from .services.ads import AdService
     from .services.broadcast import Broadcaster
+    from .services.updates import UpdateNotifier
     from .services.links import LinkService
 
 log = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class App:
     links: "LinkService" = None  # type: ignore[assignment]
     ads: "AdService" = None  # type: ignore[assignment]
     broadcaster: "Broadcaster" = None  # type: ignore[assignment]
+    updates: "UpdateNotifier" = None  # type: ignore[assignment]
     known_users: set[int] = field(default_factory=set)
     banned: dict[int, int | None] = field(default_factory=dict)  # user_id -> until (None = навсегда)
     screens: dict[int, Screen] = field(default_factory=dict)
