@@ -13,6 +13,7 @@ from aiogram.types import Update
 from bot.__main__ import setup
 from bot.backup import make_backup, restore_backup
 from bot.config import Config
+from bot.handlers.admin import people
 from bot.handlers.admin import router as admin_router
 from bot.handlers.admin.core import admin_screens
 from bot.handlers.chats import router as chats_router
@@ -417,6 +418,24 @@ class Admin(Base):
         self.assertEqual(cur.sent, 3)  # владелец тоже пользователь
         copy = tg.last(USER)
         self.assertEqual(copy.markup.inline_keyboard[0][0].url, "https://t.me/news")
+
+    async def test_broadcast_forwarded_post_as_is(self):
+        h, app, tg = self.h, self.app, self.tg
+        await h.send(USER, "/start")
+        await h.admin("x:bcfwd")
+        await h.send(OWNER, "Пост из канала", reply_markup={"inline_keyboard": [
+            [{"text": "Канал", "url": "https://t.me/news", "style": "success"}],
+            [{"text": "Сайт", "url": "https://example.com"}, {"text": "Ещё", "callback_data": "x"}]]})
+        draft = people.drafts[OWNER]
+        self.assertEqual(len(draft["buttons"]), 3)  # callback-кнопка не подтянулась
+        await h.admin("x:bcgo")
+        await app.broadcaster.task
+        copy = tg.last(USER)
+        self.assertEqual(copy.text, "Пост из канала")
+        kb = copy.markup.inline_keyboard
+        self.assertEqual(kb[0][0].url, "https://t.me/news")
+        self.assertEqual(kb[0][0].style, "success")
+        self.assertEqual(kb[1][0].url, "https://example.com")
 
     async def test_backup_restore_roundtrip(self):
         h, app = self.h, self.app
