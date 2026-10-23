@@ -56,10 +56,13 @@ class Broadcaster:
         return [r["id"] for r in rows]
 
     def start(self, admin_id: int, from_chat: int, message_id: int, ids: list[int],
-              kb: InlineKeyboardMarkup | None) -> None:
-        """Рассылка копией сообщения админа."""
+              kb: InlineKeyboardMarkup | None, forward: bool = False) -> None:
+        """Рассылка копией сообщения админа или настоящей пересылкой (с подписью «Переслано из...»)."""
         async def send(uid: int) -> None:
-            await self.app.bot.copy_message(uid, from_chat, message_id, reply_markup=kb)
+            if forward:
+                await self.app.bot.forward_message(uid, from_chat, message_id)
+            else:
+                await self.app.bot.copy_message(uid, from_chat, message_id, reply_markup=kb)
         self._launch(admin_id, ids, send, "Рассылка")
 
     def start_text(self, admin_id: int, html: str, ids: list[int], title: str = "Рассылка") -> None:

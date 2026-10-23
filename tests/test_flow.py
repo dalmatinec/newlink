@@ -426,16 +426,11 @@ class Admin(Base):
         await h.send(OWNER, "Пост из канала", reply_markup={"inline_keyboard": [
             [{"text": "Канал", "url": "https://t.me/news", "style": "success"}],
             [{"text": "Сайт", "url": "https://example.com"}, {"text": "Ещё", "callback_data": "x"}]]})
-        draft = people.drafts[OWNER]
-        self.assertEqual(len(draft["buttons"]), 3)  # callback-кнопка не подтянулась
+        self.assertTrue(people.drafts[OWNER]["forward"])
         await h.admin("x:bcgo")
         await app.broadcaster.task
-        copy = tg.last(USER)
-        self.assertEqual(copy.text, "Пост из канала")
-        kb = copy.markup.inline_keyboard
-        self.assertEqual(kb[0][0].url, "https://t.me/news")
-        self.assertEqual(kb[0][0].style, "success")
-        self.assertEqual(kb[1][0].url, "https://example.com")
+        self.assertEqual(app.broadcaster.current.sent, 2)  # пользователь и владелец
+        self.assertEqual(tg.last(USER).text, "forward")  # ушла настоящая пересылка, не копия
 
     async def test_backup_restore_roundtrip(self):
         h, app = self.h, self.app

@@ -8,7 +8,6 @@ from ...richtext import parse_contacts
 from ...services.broadcast import AUDIENCES
 from ...store import now
 from ...ui import button, grid, markup, paginate
-from .ads import _post_buttons
 from .core import PERMS, Ctx, InputError, Rows, ViewResult, action, b, back_btn, fmt_date, on_input, view
 
 
@@ -228,8 +227,8 @@ async def view_broadcast(ctx: Ctx) -> ViewResult:
     html = (f"📣 <b>Рассылка</b>\n\nПолучателей: <b>{count}</b>\n\n"
             "✍️ <b>Создать</b>: отправь любое сообщение (текст с премиум-эмодзи, фото, GIF, видео), "
             "кнопки добавишь на следующем шаге.\n"
-            "📨 <b>Переслать пост</b>: перешли готовый пост из канала или другого бота, он уйдёт как есть, "
-            "со ссылочными кнопками, их цветом и иконками.\n\n"
+            "📨 <b>Переслать пост</b>: перешли готовый пост из канала или другого бота, он уйдёт всем "
+            "настоящей пересылкой («Переслано из...»), как есть.\n\n"
             "Перед отправкой будет предпросмотр.")
     if cur is not None and cur.finished:
         html += f"\n\n<b>Прошлая рассылка:</b>\n{cur.summary()}"
@@ -252,25 +251,21 @@ async def in_broadcast(ctx: Ctx, message: Message):
 @action("bcfwd", "broadcast")
 async def act_broadcast_forward(ctx: Ctx):
     return await ctx.ask("bcfwd", "📨 Перешли сюда готовый пост (из канала или от другого бота). Он уйдёт "
-                                  "пользователям как есть: текст, медиа, премиум-эмодзи и кнопки со ссылками.",
-                         "a:bc", keep_message=True)
+                                  "пользователям настоящей пересылкой: «Переслано из...», со всем содержимым "
+                                  "и кнопками как в оригинале.", "a:bc", keep_message=True)
 
 
 @on_input("bcfwd", "broadcast")
 async def in_broadcast_forward(ctx: Ctx, message: Message):
-    buttons = _post_buttons(message)
-    drafts[ctx.user_id] = {"msg": message.message_id, "buttons": buttons, "aud": "all"}
-    kb = message.reply_markup
-    total = sum(len(row) for row in kb.inline_keyboard) if kb else 0
-    if total > len(buttons):
-        ctx.notice = (f"ℹ️ Подтянул кнопок: {len(buttons)} из {total}. Остальные не ссылки, "
-                      "в рассылке они бы не работали.")
+    if message.media_group_id:
+        raise InputError("Альбом из нескольких фото так не перешлётся. Пришли один пост, а не альбом.")
+    drafts[ctx.user_id] = {"msg": message.message_id, "buttons": [], "aud": "all", "forward": True}
     return "a:bcc"
 
 
 def _draft_kb(draft: dict):
     rows = []
-    for label, url, icon, *rest in draft["buttons"]:  # у пересланного поста есть ещё цвет кнопки
+    for label, url, icon, *rest in draft["buttons"]:
         rows.append([button(label, icon, rest[0] if rest else None, url=url)])
     return markup(rows)
 
@@ -281,11 +276,13 @@ async def view_broadcast_confirm(ctx: Ctx) -> ViewResult:
     if draft is None:
         return await view_broadcast(ctx)
     count = len(await ctx.app.broadcaster.audience(draft["aud"]))
+    forward = bool(draft.get("forward"))
+    info = "Уйдёт пересылкой («Переслано из...»), как в оригинале." if forward else f"Кнопок: <b>{len(draft['buttons'])}</b>"
     html = (f"☝️ Сообщение выше получат <b>{count}</b> пользователей.\n"
-            f"Кнопок: <b>{len(draft['buttons'])}</b>\n\nПроверь 👁 Предпросмотром и жми ✅ Отправить.")
+            f"{info}\n\nПроверь 👁 Предпросмотром и жми ✅ Отправить.")
     rows: Rows = [
         [b(("• " if k == draft["aud"] else "") + name, f"x:bcaud:{k}") for k, (name, _) in AUDIENCES.items()],
-        [b("🔘 Кнопки", "x:bcbtn"), b("👁 Предпросмотр", "x:bcprev")],
+        [b("👁 Предпросмотр", "x:bcprev")] if forward else [b("🔘 Кнопки", "x:bcbtn"), b("👁 Предпросмотр", "x:bcprev")],
         [b("✅ Отправить", "x:bcgo", "success"), b("✖️ Отмена", "x:bcno")],
     ]
     return html, rows
@@ -324,7 +321,10 @@ async def act_broadcast_preview(ctx: Ctx):
     draft = drafts.get(ctx.user_id)
     if draft is None:
         return "a:bc"
-    await ctx.app.bot.copy_message(ctx.chat_id, ctx.chat_id, draft["msg"], reply_markup=_draft_kb(draft))
+    if draft.get("forward"):
+        await ctx.app.bot.forward_message(ctx.chat_id, ctx.chat_id, draft["msg"])
+    else:
+        await ctx.app.bot.copy_message(ctx.chat_id, ctx.chat_id, draft["msg"], reply_markup=_draft_kb(draft))
     await ctx.toast("👇 Так увидят пользователи")
     return None
 
@@ -342,7 +342,7 @@ async def act_broadcast_go(ctx: Ctx):
     if draft is None or br.running:
         return "a:bc"
     ids = await br.audience(draft["aud"])
-    br.start(ctx.user_id, ctx.chat_id, draft["msg"], ids, _draft_kb(draft))
+    br.start(ctx.user_id, ctx.chat_id, draft["msg"], ids, _draft_kb(draft), forward=bool(draft.get("forward")))
     await ctx.log("broadcast.start", f"{len(ids)} получателей")
     ctx.notice = "🚀 Рассылка запущена. Пришлю отчёт, когда закончится."
     return "a:bc"
