@@ -224,22 +224,16 @@ async def view_broadcast(ctx: Ctx) -> ViewResult:
         html = f"📣 <b>Идёт рассылка</b>: {pct}%\n\n{cur.summary()}"
         return html, [[b("🔄 Обновить", "a:bc"), b("⛔️ Остановить", "x:bcstop", "danger")], back_btn("a:home")]
     count = len(await br.audience("all"))
-    html = (f"📣 <b>Рассылка</b>\n\nПолучателей: <b>{count}</b>\n\n"
-            "✍️ <b>Создать</b>: отправь любое сообщение (текст с премиум-эмодзи, фото, GIF, видео), "
-            "кнопки добавишь на следующем шаге.\n"
-            "📨 <b>Переслать пост</b>: перешли готовый пост из канала или другого бота, он уйдёт всем "
-            "настоящей пересылкой («Переслано из...»), как есть.\n\n"
-            "Перед отправкой будет предпросмотр.")
+    html = f"📣 <b>Рассылка</b>\n\nПолучателей: <b>{count}</b>"
     if cur is not None and cur.finished:
         html += f"\n\n<b>Прошлая рассылка:</b>\n{cur.summary()}"
     return html, [[b("✍️ Создать рассылку", "x:bcnew", "success")],
-                  [b("📨 Переслать готовый пост", "x:bcfwd", "primary")], back_btn("a:home")]
+                  [b("📨 Forward", "x:bcfwd", "primary")], back_btn("a:home")]
 
 
 @action("bcnew", "broadcast")
 async def act_broadcast_new(ctx: Ctx):
-    return await ctx.ask("bcnew", "Отправь сообщение для рассылки - люди получат его ровно в таком виде.", "a:bc",
-                         keep_message=True)
+    return await ctx.ask("bcnew", "Отправь сообщение для рассылки.", "a:bc", keep_message=True)
 
 
 @on_input("bcnew", "broadcast")
@@ -250,15 +244,13 @@ async def in_broadcast(ctx: Ctx, message: Message):
 
 @action("bcfwd", "broadcast")
 async def act_broadcast_forward(ctx: Ctx):
-    return await ctx.ask("bcfwd", "📨 Перешли сюда готовый пост (из канала или от другого бота). Он уйдёт "
-                                  "пользователям настоящей пересылкой: «Переслано из...», со всем содержимым "
-                                  "и кнопками как в оригинале.", "a:bc", keep_message=True)
+    return await ctx.ask("bcfwd", "Перешли готовый пост.", "a:bc", keep_message=True)
 
 
 @on_input("bcfwd", "broadcast")
 async def in_broadcast_forward(ctx: Ctx, message: Message):
     if message.media_group_id:
-        raise InputError("Альбом из нескольких фото так не перешлётся. Пришли один пост, а не альбом.")
+        raise InputError("Альбомы не поддерживаются, перешли один пост.")
     drafts[ctx.user_id] = {"msg": message.message_id, "buttons": [], "aud": "all", "forward": True}
     return "a:bcc"
 
@@ -277,9 +269,8 @@ async def view_broadcast_confirm(ctx: Ctx) -> ViewResult:
         return await view_broadcast(ctx)
     count = len(await ctx.app.broadcaster.audience(draft["aud"]))
     forward = bool(draft.get("forward"))
-    info = "Уйдёт пересылкой («Переслано из...»), как в оригинале." if forward else f"Кнопок: <b>{len(draft['buttons'])}</b>"
-    html = (f"☝️ Сообщение выше получат <b>{count}</b> пользователей.\n"
-            f"{info}\n\nПроверь 👁 Предпросмотром и жми ✅ Отправить.")
+    info = "" if forward else f"\nКнопок: <b>{len(draft['buttons'])}</b>"
+    html = f"☝️ Сообщение выше получат <b>{count}</b> пользователей.{info}"
     rows: Rows = [
         [b(("• " if k == draft["aud"] else "") + name, f"x:bcaud:{k}") for k, (name, _) in AUDIENCES.items()],
         [b("👁 Предпросмотр", "x:bcprev")] if forward else [b("🔘 Кнопки", "x:bcbtn"), b("👁 Предпросмотр", "x:bcprev")],
